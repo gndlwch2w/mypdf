@@ -1,0 +1,230 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>MyPDF - Every PDF tool you need</title>
+  <link rel="stylesheet" href="/css/styles.css" />
+  <link rel="stylesheet" href="/css/all.min.css" />
+  <script src="/js/pdf.min.js" defer></script>
+  <script>
+    window.addEventListener('DOMContentLoaded', () => {
+      if (window['pdfjsLib']) {
+        pdfjsLib.GlobalWorkerOptions.workerSrc = '/js/pdf.worker.min.js';
+      }
+    });
+  </script>
+</head>
+<body>
+  <!-- Tool Header - only visible in tool view -->
+  <header class="tool-header" id="tool-header" style="display: none;">
+    <div class="container">
+      <div class="tool-header-content">
+        <button class="btn btn-back" id="backHome">
+          <i class="fas fa-arrow-left"></i>
+        </button>
+        <div class="tool-header-info">
+          <div class="tool-header-icon" id="toolHeaderIcon">
+            <i class="fas fa-file-pdf"></i>
+          </div>
+          <div class="tool-header-text">
+            <h1 id="tool-title">PDF Tool</h1>
+            <p id="tool-description">Tool description goes here</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main>
+    <section id="home" class="view visible">
+      <div class="hero">
+        <div class="container">
+          <h1>Every tool you need to work with PDFs in one place</h1>
+          <p>Every tool you need to use PDFs, at your fingertips. All are 100% FREE and easy to use! Merge, split, compress, convert, rotate, unlock and watermark PDFs with just a few clicks.</p>
+        </div>
+      </div>
+      
+      <div class="tools-section">
+        <div class="container">
+          <div class="tools-grid">
+            <button class="tool-card" data-open="merge">
+              <div class="tool-icon">
+                <i class="fas fa-object-group"></i>
+              </div>
+              <h3>Merge PDF</h3>
+              <p>Combine PDFs in the order you want with the easiest PDF merger available.</p>
+            </button>
+            
+            <button class="tool-card" data-open="split">
+              <div class="tool-icon">
+                <i class="fas fa-cut"></i>
+              </div>
+              <h3>Split PDF</h3>
+              <p>Separate one page or a whole set for easy conversion into independent PDF files.</p>
+            </button>
+            
+            <button class="tool-card" data-open="compress">
+              <div class="tool-icon">
+                <i class="fas fa-compress-arrows-alt"></i>
+              </div>
+              <h3>Compress PDF</h3>
+              <p>Reduce file size while optimizing for maximal PDF quality.</p>
+            </button>
+            
+            <button class="tool-card" data-open="pdf-to-images">
+              <div class="tool-icon">
+                <i class="fas fa-image"></i>
+              </div>
+              <h3>PDF to JPG</h3>
+              <p>Convert each PDF page into a JPG or extract all images contained in a PDF.</p>
+            </button>
+            
+            <button class="tool-card" data-open="images-to-pdf">
+              <div class="tool-icon">
+                <i class="fas fa-images"></i>
+              </div>
+              <h3>JPG to PDF</h3>
+              <p>Convert JPG images to PDF in seconds. Easily adjust orientation and margins.</p>
+            </button>
+            
+            <button class="tool-card" data-open="rotate">
+              <div class="tool-icon">
+                <i class="fas fa-sync-alt"></i>
+              </div>
+              <h3>Rotate PDF</h3>
+              <p>Rotate your PDFs the way you need them. You can even rotate multiple PDFs at once!</p>
+            </button>
+            
+            <button class="tool-card" data-open="watermark">
+              <div class="tool-icon">
+                <i class="fas fa-stamp"></i>
+              </div>
+              <h3>Watermark</h3>
+              <p>Stamp an image or text over your PDF in seconds. Choose the typography, transparency and position.</p>
+            </button>
+            
+            <button class="tool-card" data-open="unlock">
+              <div class="tool-icon">
+                <i class="fas fa-unlock"></i>
+              </div>
+              <h3>Unlock PDF</h3>
+              <p>Remove PDF password security, giving you the freedom to use your PDFs as you want.</p>
+            </button>
+            
+            <button class="tool-card" data-open="protect">
+              <div class="tool-icon">
+                <i class="fas fa-lock"></i>
+              </div>
+              <h3>Protect PDF</h3>
+              <p>Protect PDF files with a password. Encrypt PDF documents to prevent unauthorized access.</p>
+            </button>
+            
+            <button class="tool-card" data-open="reorder">
+              <div class="tool-icon">
+                <i class="fas fa-sort"></i>
+              </div>
+              <h3>Organize PDF</h3>
+              <p>Sort pages of your PDF file however you like. Delete PDF pages or add PDF pages to your document.</p>
+            </button>
+            
+            <button class="tool-card" data-open="pagenum">
+              <div class="tool-icon">
+                <i class="fas fa-list-ol"></i>
+              </div>
+              <h3>Page numbers</h3>
+              <p>Add page numbers into PDFs with ease. Choose your positions, dimensions, typography.</p>
+            </button>
+            
+            <button class="tool-card" data-open="extract-text">
+              <div class="tool-icon">
+                <i class="fas fa-file-alt"></i>
+              </div>
+              <h3>Extract Text</h3>
+              <p>Extract text content from your PDF documents for easy editing and reuse.</p>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- Tool Panel -->
+    <section id="tool-panel" class="view">
+      <div class="container">        
+        <div class="tool-content">
+          <div class="upload-section">
+            <input type="file" id="file-input" hidden multiple />
+            <div id="dropzone" class="dropzone">
+              <div id="dropzone-placeholder" class="dropzone-placeholder">
+                <div class="dropzone-content">
+                  <i class="fas fa-cloud-upload-alt dropzone-icon"></i>
+                  <h3>Select PDF files</h3>
+                  <p>or drop PDF files here</p>
+                  <button class="btn btn-primary" id="browseBtn" type="button">Select PDF files</button>
+                </div>
+              </div>
+              
+              <div id="dropzone-files" class="dropzone-files" style="display: none;">
+                <div class="dropzone-header">
+                  <div class="dropzone-title">
+                    <i class="fas fa-file-pdf"></i>
+                    <span>Selected files</span>
+                    <span class="file-count">0 files</span>
+                  </div>
+                  <button type="button" id="addMoreBtn" class="btn btn-outline btn-small">
+                    <i class="fas fa-plus"></i>
+                    Add more files
+                  </button>
+                </div>
+                <div id="file-list" class="file-list"></div>
+                <div class="dropzone-actions">
+                  <div class="drop-hint">
+                    <i class="fas fa-hand-paper"></i>
+                    <span>Drag files here to add more, or use the button above</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          
+          <div id="options" class="options-section"></div>
+          
+          <div class="action-section">
+            <button class="btn btn-primary btn-large" id="runBtn">
+              <span id="btnText">Process PDF</span>
+              <i class="fas fa-spinner fa-spin" id="btnSpinner" style="display:none;"></i>
+            </button>
+            <div id="status" class="status-message"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- PDF Preview Modal -->
+  <div id="pdf-preview-modal" class="pdf-preview-modal">
+    <div class="pdf-preview-container">
+      <div class="pdf-preview-header">
+        <h3 id="pdf-preview-title" class="pdf-preview-title">PDF Preview</h3>
+        <button id="pdf-preview-close" class="pdf-preview-close">&times;</button>
+      </div>
+      <div class="pdf-preview-content" id="pdf-preview-content">
+        <div class="preview-loading">
+          <i class="fas fa-spinner"></i>
+          <span>Loading...</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <footer class="footer">
+    <div class="container">
+      <div class="footer-bottom">
+        <p>© 2025 MyPDF - Built with <i class="fas fa-heart" style="color: #e53e3e;"></i> by chishengchen & GitHub Copilot</p>
+      </div>
+    </div>
+  </footer>
+
+  <script src="/js/app.js" defer></script>
+</body>
+</html>
