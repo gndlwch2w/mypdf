@@ -188,8 +188,10 @@ main {
 
 .tools-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(4, 1fr);
   gap: 24px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 .tool-card {
@@ -1231,7 +1233,13 @@ main {
   margin: 0 4px;
 }
 
-/* Responsive design */
+/* Responsive design - add extra breakpoints to support 4-column layout */
+@media (max-width: 1200px) {
+  .tools-grid {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
 @media (max-width: 768px) {
   .tool-header-content {
     gap: 12px;
@@ -1262,6 +1270,13 @@ main {
     font-size: 16px;
   }
   
+  .tools-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 16px;
+  }
+}
+
+@media (max-width: 480px) {
   .tools-grid {
     grid-template-columns: 1fr;
   }

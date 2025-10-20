@@ -460,9 +460,9 @@ class PDFToolManager {
     info.className = 'file-info';
     info.textContent = this.formatFileSize(file.size);
     
-    // 添加预览点击事件
+    // Add preview click event
     item.addEventListener('click', (e) => {
-      // 如果点击的是删除按钮，不触发预览
+      // If delete button is clicked, don't trigger preview
       if (e.target === removeBtn || removeBtn.contains(e.target)) {
         return;
       }
@@ -1112,7 +1112,7 @@ class PDFToolManager {
   async runRotate(files) {
     const fd = new FormData();
     fd.append('file', files[0]);
-    fd.append('degrees', document.getElementById('optDeg').value || '90');
+    fd.append('angle', document.getElementById('optDeg').value || '90');
     
     const res = await fetch('/api/pdf/rotate', { method: 'POST', body: fd });
     
@@ -1212,6 +1212,12 @@ class PDFToolManager {
     const fd = new FormData();
     fd.append('file', files[0]);
     
+    // Add format and quality parameters
+    const format = document.getElementById('optFormat')?.value || 'png';
+    const quality = document.getElementById('optQuality')?.value || 'medium';
+    fd.append('format', format);
+    fd.append('quality', quality);
+    
     const res = await fetch('/api/pdf/pdf-to-images', { method: 'POST', body: fd });
     
     if (!res.ok) {
@@ -1228,6 +1234,10 @@ class PDFToolManager {
   async runImagesToPdf(files) {
     const fd = new FormData();
     for (const f of files) fd.append('files', f);
+    
+    // Add page size parameter
+    const pageSize = document.getElementById('optPageSize')?.value || 'auto';
+    fd.append('page_size', pageSize);
     
     const res = await fetch('/api/pdf/images-to-pdf', { method: 'POST', body: fd });
     
