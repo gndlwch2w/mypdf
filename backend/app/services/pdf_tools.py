@@ -614,6 +614,42 @@ def zip_named_files(name_bytes: Dict[str, bytes]) -> bytes:
         raise ValueError(f"Failed to create ZIP file: {e}")
 
 
+def get_pdf_metadata_bytes(file_data: bytes) -> dict:
+    """Extract comprehensive metadata from PDF file."""
+    validate_pdf_data(file_data)
+    
+    try:
+        reader = PdfReader(io.BytesIO(file_data))
+        metadata = reader.metadata or {}
+        
+        # Basic document information
+        result = {
+            "pages": len(reader.pages),
+            "title": metadata.get("/Title"),
+            "author": metadata.get("/Author"),
+            "subject": metadata.get("/Subject"),
+            "creator": metadata.get("/Creator"),
+            "producer": metadata.get("/Producer"),
+            "creation_date": str(metadata.get("/CreationDate")) if metadata.get("/CreationDate") else None,
+            "modification_date": str(metadata.get("/ModDate")) if metadata.get("/ModDate") else None,
+            "is_encrypted": reader.is_encrypted
+        }
+        
+        # Clean up None values and convert to strings
+        cleaned_result = {}
+        for key, value in result.items():
+            if value is not None:
+                cleaned_result[key] = str(value) if not isinstance(value, (int, bool)) else value
+            else:
+                cleaned_result[key] = value
+        
+        return cleaned_result
+        
+    except Exception as e:
+        logger.error(f"Metadata extraction failed: {e}")
+        raise ValueError(f"Failed to extract metadata: {e}")
+
+
 def reorder_pdf_bytes(file_data: bytes, order_csv: str) -> bytes:
     """Reorder PDF pages according to the specified page order."""
     validate_pdf_data(file_data)
