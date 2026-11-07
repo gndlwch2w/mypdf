@@ -28,8 +28,9 @@ const excludedModules = [
   'yaml'
 ]
 
+const traceWindows = process.platform === 'win32' && process.env.MYPDF_PYINSTALLER_TRACE === '1'
 const args = [
-  '-m', 'PyInstaller',
+  ...(traceWindows ? ['-u', 'scripts/trace-pyinstaller.py'] : ['-m', 'PyInstaller']),
   '--noconfirm',
   '--noupx',
   '--onefile',

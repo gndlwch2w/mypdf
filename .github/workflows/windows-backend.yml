@@ -6,6 +6,7 @@ on:
     paths:
       - 'backend/**'
       - 'scripts/build-backend.mjs'
+      - 'scripts/trace-pyinstaller.py'
       - '.github/workflows/windows-backend.yml'
   workflow_dispatch:
 
@@ -43,8 +44,11 @@ jobs:
           .venv\Scripts\python.exe -m pip install --upgrade pip
           .venv\Scripts\python.exe -m pip install -r backend\requirements.txt -r backend\requirements-build.txt
 
-      - name: Freeze backend
+      - name: Freeze backend (trace Windows imports and DLLs)
         run: node scripts/build-backend.mjs
+        env:
+          MYPDF_PYINSTALLER_TRACE: '1'
+          MYPDF_PYINSTALLER_TIMEOUT_MS: '480000'
 
       - name: Start frozen backend and check health
         shell: pwsh
