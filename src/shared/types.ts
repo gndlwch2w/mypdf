@@ -5,6 +5,7 @@ export type ToolId =
   | 'pdf-to-images'
   | 'images-to-pdf'
   | 'powerpoint'
+  | 'edit'
   | 'rotate'
   | 'watermark'
   | 'unlock'
@@ -26,11 +27,72 @@ export interface OrganizePage {
   included: boolean
 }
 
+export type PdfEditorTool = 'select' | 'hand' | 'text' | 'shape' | 'draw'
+export type PdfShapeKind = 'rectangle' | 'ellipse' | 'line' | 'arrow'
+
+export interface PdfEditElementBase {
+  id: string
+  page: number
+  x: number
+  y: number
+  width: number
+  height: number
+  opacity: number
+  zIndex: number
+}
+
+export interface PdfTextElement extends PdfEditElementBase {
+  type: 'text'
+  text: string
+  fontFamily: 'helvetica' | 'times' | 'courier'
+  fontSize: number
+  color: string
+  bold: boolean
+  italic: boolean
+  underline: boolean
+  align: 'left' | 'center' | 'right'
+}
+
+export interface PdfImageElement extends PdfEditElementBase {
+  type: 'image'
+  assetId: string
+}
+
+export interface PdfShapeElement extends PdfEditElementBase {
+  type: 'shape'
+  shape: PdfShapeKind
+  stroke: string
+  fill: string
+  strokeWidth: number
+}
+
+export interface PdfDrawingElement extends PdfEditElementBase {
+  type: 'drawing'
+  points: number[]
+  stroke: string
+  strokeWidth: number
+}
+
+export type PdfEditElement = PdfTextElement | PdfImageElement | PdfShapeElement | PdfDrawingElement
+
+export interface PdfEditDocument {
+  version: 1
+  pageCount: number
+  elements: PdfEditElement[]
+}
+
+export interface PdfEditAsset {
+  id: string
+  file: DesktopFile
+}
+
 export interface ProcessRequest {
   tool: ToolId
   files: DesktopFile[]
   options: Record<string, string>
   organizePages?: OrganizePage[]
+  editorDocument?: PdfEditDocument
+  editorAssets?: PdfEditAsset[]
 }
 
 export interface ProcessResult {
@@ -50,6 +112,7 @@ export interface PdfMetadata {
 export interface MyPdfApi {
   selectFiles(tool: ToolId): Promise<DesktopFile[]>
   selectWatermarkImage(): Promise<DesktopFile | null>
+  selectEditorImage(): Promise<DesktopFile | null>
   describeDroppedFiles(paths: string[]): Promise<DesktopFile[]>
   getPathForFile(file: File): string
   readFile(file: DesktopFile): Promise<Uint8Array>

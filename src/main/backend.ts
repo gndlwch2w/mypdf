@@ -24,6 +24,7 @@ const endpointByTool: Record<Exclude<ToolId, 'organize'>, string> = {
   'pdf-to-images': 'pdf-to-images',
   'images-to-pdf': 'images-to-pdf',
   powerpoint: 'powerpoint',
+  edit: 'edit',
   rotate: 'rotate',
   watermark: 'watermark',
   unlock: 'unlock',
@@ -39,6 +40,7 @@ const defaultFilename: Record<ToolId, string> = {
   'pdf-to-images': 'pdf-images.zip',
   'images-to-pdf': 'converted.pdf',
   powerpoint: 'presentation.pdf',
+  edit: 'edited.pdf',
   rotate: 'rotated.pdf',
   watermark: 'watermarked.pdf',
   unlock: 'unlocked.pdf',
@@ -78,6 +80,7 @@ const outputSuffix: Record<ToolId, string> = {
   'pdf-to-images': 'pdf_images',
   'images-to-pdf': 'images_to_pdf',
   powerpoint: 'powerpoint',
+  edit: 'edited',
   rotate: 'rotated',
   watermark: 'watermarked',
   unlock: 'unlocked',
@@ -225,6 +228,19 @@ export class BackendService {
         ? file.type || 'application/octet-stream'
         : 'application/pdf'
       form.append(multiple ? 'files' : 'file', fileBlob(await readFile(file.path), type), file.name)
+    }
+
+    if (request.tool === 'edit') {
+      if (!request.editorDocument) throw new Error('The PDF edit document is missing')
+      form.append('operations', JSON.stringify(request.editorDocument))
+      for (const asset of request.editorAssets ?? []) {
+        const extension = extname(asset.file.name) || '.png'
+        form.append(
+          'assets',
+          fileBlob(await readFile(asset.file.path), asset.file.type || 'application/octet-stream'),
+          `${asset.id}${extension}`
+        )
+      }
     }
 
     if (request.tool === 'watermark' && request.options.watermark_image_path) {

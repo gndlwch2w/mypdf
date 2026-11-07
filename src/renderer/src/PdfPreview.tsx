@@ -33,7 +33,7 @@ export function PowerPointThumbnail({ file }: { file: DesktopFile }): React.JSX.
   )
 }
 
-function loadPdf(file: DesktopFile): Promise<PDFDocumentProxy> {
+export function loadPdf(file: DesktopFile): Promise<PDFDocumentProxy> {
   const cached = pdfCache.get(file.path)
   if (cached) return cached
 

@@ -98,6 +98,15 @@ function registerIpc(): void {
     return await describePath(result.filePaths[0])
   })
 
+  ipcMain.handle('dialog:select-editor-image', async () => {
+    const result = await dialog.showOpenDialog(mainWindow!, {
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: [...imageExtensions].map((value) => value.slice(1)) }]
+    })
+    if (result.canceled || !result.filePaths[0]) return null
+    return await describePath(result.filePaths[0])
+  })
+
   ipcMain.handle('files:describe', async (_event, paths: string[]) => {
     return await Promise.all(paths.map(describePath))
   })
