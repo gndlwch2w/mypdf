@@ -1,6 +1,7 @@
 import type { ToolId } from '../../shared/types'
 import { useState } from 'react'
-import { FiEye, FiEyeOff, FiFileText, FiImage, FiMonitor } from 'react-icons/fi'
+import { FiEye, FiEyeOff, FiFileText, FiImage, FiMonitor, FiPrinter } from 'react-icons/fi'
+import { LuPresentation } from 'react-icons/lu'
 import PageNumberOptions from './PageNumberOptions'
 import WatermarkOptions from './WatermarkOptions'
 
@@ -99,6 +100,8 @@ export function defaultOptions(tool: ToolId): Record<string, string> {
       return { mode: 'pages', format: 'png', quality: 'medium' }
     case 'images-to-pdf':
       return { page_size: 'A4', orientation: 'portrait', margin: 'none' }
+    case 'powerpoint':
+      return { output_mode: 'electronic' }
     case 'rotate':
       return { angle: '90' }
     case 'watermark':
@@ -282,6 +285,24 @@ export default function ToolOptions({
             ))}
           </div>
         </section>
+      </div>
+    )
+  }
+  if (tool === 'powerpoint') {
+    const modes = [
+      ['electronic', 'Electronic PDF', 'Optimized for sharing and screens.', FiMonitor],
+      ['print', 'Print PDF', 'Higher quality for printing.', FiPrinter],
+      ['flattened', 'Flattened PowerPoint', 'Each slide becomes one full-slide image.', LuPresentation]
+    ] as const
+    return (
+      <div className="powerpoint-mode-grid">
+        {modes.map(([value, title, detail, Icon]) => (
+          <button className={`powerpoint-mode ${options.output_mode === value ? 'selected' : ''}`} type="button" key={value} onClick={() => onChange('output_mode', value)}>
+            <Icon />
+            <span><strong>{title}</strong><small>{detail}</small></span>
+          </button>
+        ))}
+        <p>Conversion runs locally through LibreOffice. No presentation is uploaded.</p>
       </div>
     )
   }

@@ -4,6 +4,7 @@ from typing import List, Optional
 import io
 import logging
 import asyncio
+import zipfile
 from datetime import datetime
 from pathlib import Path
 
@@ -544,6 +545,69 @@ async def get_pdf_metadata(file: UploadFile = File(...)):
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise create_error_response(e, "Metadata extraction")
+
+
+@router.post("/powerpoint")
+async def convert_powerpoint(
+    files: List[UploadFile] = File(...),
+    output_mode: str = Form("electronic"),
+):
+    """Batch export PPT/PPTX files to PDFs or image-only flattened PPTX files."""
+    try:
+        if not files:
+            raise InvalidFileError("Add at least one PowerPoint file")
+        if len(files) > settings.max_files_count:
+            raise ValidationError(f"A maximum of {settings.max_files_count} files can be processed at once")
+        if output_mode not in {"electronic", "print", "flattened"}:
+            raise ValidationError("Invalid PowerPoint output mode")
+
+        outputs = []
+        used_names = set()
+        for index, file in enumerate(files):
+            filename = Path(file.filename or f"presentation-{index + 1}.pptx").name
+            if Path(filename).suffix.lower() not in {".ppt", ".pptx"}:
+                raise InvalidFileError(f"{filename} must use the .ppt or .pptx extension")
+            file_data = await file.read()
+            if not file_data:
+                raise InvalidFileError(f"{filename} is empty")
+            if len(file_data) > settings.max_file_size_bytes:
+                raise FileSizeError(f"{filename} exceeds the {settings.max_file_size_mb}MB limit")
+
+            if output_mode == "flattened":
+                result = pdf_tools.powerpoint_to_flattened_pptx_bytes(file_data, filename)
+                extension = ".pptx"
+                suffix = "flattened"
+            else:
+                result = pdf_tools.powerpoint_to_pdf_bytes(file_data, filename, output_mode)
+                extension = ".pdf"
+                suffix = output_mode
+            output_name = f"{Path(filename).stem}_{suffix}{extension}"
+            if output_name.lower() in used_names:
+                output_name = f"{Path(filename).stem}_{suffix}_{index + 1}{extension}"
+            used_names.add(output_name.lower())
+            outputs.append((output_name, result))
+
+        if len(outputs) > 1:
+            archive = io.BytesIO()
+            with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                for output_name, result in outputs:
+                    zip_file.writestr(output_name, result)
+            result = archive.getvalue()
+            media_type = "application/zip"
+            output_name = "powerpoint-batch.zip"
+        else:
+            output_name, result = outputs[0]
+            media_type = "application/vnd.openxmlformats-officedocument.presentationml.presentation" if output_mode == "flattened" else "application/pdf"
+
+        return StreamingResponse(
+            io.BytesIO(result),
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={output_name}"},
+        )
+    except (InvalidFileError, FileSizeError, ValidationError, ValueError) as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except Exception as error:
+        raise create_error_response(error, "PowerPoint conversion")
 
 # Health check endpoint for PDF service
 @router.get("/health", response_model=HealthResponse)

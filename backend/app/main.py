@@ -101,7 +101,7 @@ async def pdf_processing_exception_handler(request: Request, exc: PDFProcessingE
     
     return JSONResponse(
         status_code=status_code,
-        content=error_response.dict()
+        content=error_response.model_dump(mode="json")
     )
 
 # Enhanced global exception handler
@@ -118,7 +118,7 @@ async def global_exception_handler(request: Request, exc: Exception):
     
     return JSONResponse(
         status_code=500,
-        content=error_response.dict()
+        content=error_response.model_dump(mode="json")
     )
 
 @app.exception_handler(HTTPException)
@@ -133,7 +133,7 @@ async def http_exception_handler(request: Request, exc: HTTPException):
     
     return JSONResponse(
         status_code=exc.status_code,
-        content=error_response.dict()
+        content=error_response.model_dump(mode="json")
     )
 
 # Request logging middleware with performance monitoring

@@ -6,6 +6,7 @@ A local-first desktop PDF toolkit. Files are processed on the current device and
 
 - Merge, split, compress, and organize PDFs
 - Convert between PDFs and images
+- Export PowerPoint files as electronic PDFs, print PDFs, or flattened presentations
 - Extract embedded images from PDFs
 - Rotate pages and add watermarks or page numbers
 - Protect and unlock PDFs
@@ -23,6 +24,9 @@ A local-first desktop PDF toolkit. Files are processed on the current device and
 - Python 3.9+
 - npm
 - Tesseract (optional, required only for OCR)
+- LibreOffice (required for PowerPoint conversion)
+
+PowerPoint setup and usage: [docs/powerpoint-conversion.md](docs/powerpoint-conversion.md)
 
 macOS / Linux:
 

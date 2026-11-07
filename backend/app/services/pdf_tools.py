@@ -1,7 +1,13 @@
 from typing import List, Optional, Dict, Tuple
 import io
+import os
+import shutil
+import subprocess
+import sys
+import tempfile
 import zipfile
 import logging
+from pathlib import Path
 from contextlib import contextmanager
 from PyPDF2 import PdfReader, PdfWriter
 from reportlab.pdfgen import canvas
@@ -13,9 +19,123 @@ from PIL import Image
 import pikepdf
 import fitz  # PyMuPDF
 from pytesseract import image_to_string
+from pptx import Presentation
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+
+def _find_soffice() -> str:
+    candidates = [
+        shutil.which("soffice"),
+        shutil.which("libreoffice"),
+        "/Applications/LibreOffice.app/Contents/MacOS/soffice",
+        os.path.join(os.environ.get("PROGRAMFILES", ""), "LibreOffice", "program", "soffice.exe"),
+        os.path.join(os.environ.get("PROGRAMFILES(X86)", ""), "LibreOffice", "program", "soffice.exe"),
+    ]
+    for candidate in candidates:
+        if candidate and os.path.isfile(candidate):
+            return candidate
+    raise ValueError("LibreOffice is required for PowerPoint conversion. Install it and restart MyPDF.")
+
+
+def _powerpoint_to_pdf_macos(source_path: Path, pdf_path: Path) -> None:
+    """Use an installed Microsoft PowerPoint app for native macOS PDF export."""
+    powerpoint_app = Path("/Applications/Microsoft PowerPoint.app")
+    if not powerpoint_app.is_dir():
+        raise ValueError("Microsoft PowerPoint or LibreOffice is required for PowerPoint conversion")
+    script = [
+        "on run argv",
+        "set inputFile to POSIX file (item 1 of argv)",
+        "set outputFile to POSIX file (item 2 of argv)",
+        'tell application "Microsoft PowerPoint"',
+        "open inputFile",
+        "save active presentation in outputFile as save as PDF",
+        "close active presentation saving no",
+        "end tell",
+        "end run",
+    ]
+    command = ["/usr/bin/osascript"]
+    for line in script:
+        command.extend(["-e", line])
+    command.extend([str(source_path), str(pdf_path)])
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=180, check=False)
+    except subprocess.TimeoutExpired as error:
+        raise ValueError("Microsoft PowerPoint export timed out") from error
+    if result.returncode != 0 or not pdf_path.exists():
+        detail = (result.stderr or result.stdout or "Unknown Microsoft PowerPoint error").strip()
+        raise ValueError(f"Microsoft PowerPoint export failed: {detail}")
+
+
+def powerpoint_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "electronic") -> bytes:
+    """Render a PowerPoint presentation to PDF using local LibreOffice."""
+    if quality not in {"electronic", "print"}:
+        raise ValueError("PowerPoint PDF quality must be electronic or print")
+    suffix = Path(filename).suffix.lower()
+    if suffix not in {".ppt", ".pptx"}:
+        raise ValueError("PowerPoint file must use the .ppt or .pptx extension")
+
+    with tempfile.TemporaryDirectory(prefix="mypdf-ppt-") as temp_dir:
+        source_path = Path(temp_dir) / f"presentation{suffix}"
+        source_path.write_bytes(file_data)
+        pdf_path = source_path.with_suffix(".pdf")
+        if sys.platform == "darwin" and Path("/Applications/Microsoft PowerPoint.app").is_dir():
+            _powerpoint_to_pdf_macos(source_path, pdf_path)
+            exported = pdf_path.read_bytes()
+            return compress_pdf_bytes(exported, "medium") if quality == "electronic" else exported
+
+        if quality == "electronic":
+            pdf_filter = 'pdf:impress_pdf_Export:{"Quality":{"type":"long","value":"85"},"ReduceImageResolution":{"type":"boolean","value":"true"},"MaxImageResolution":{"type":"long","value":"150"}}'
+        else:
+            pdf_filter = 'pdf:impress_pdf_Export:{"Quality":{"type":"long","value":"100"},"ReduceImageResolution":{"type":"boolean","value":"false"}}'
+
+        try:
+            result = subprocess.run(
+                [_find_soffice(), "--headless", "--convert-to", pdf_filter, "--outdir", temp_dir, str(source_path)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise ValueError("PowerPoint conversion timed out") from error
+
+        if result.returncode != 0 or not pdf_path.exists():
+            detail = (result.stderr or result.stdout or "Unknown LibreOffice error").strip()
+            raise ValueError(f"PowerPoint conversion failed: {detail}")
+        return pdf_path.read_bytes()
+
+
+def powerpoint_to_flattened_pptx_bytes(file_data: bytes, filename: str) -> bytes:
+    """Create a PPTX whose slides are full-page images of the source slides."""
+    pdf_data = powerpoint_to_pdf_bytes(file_data, filename, "print")
+    with fitz.open(stream=pdf_data, filetype="pdf") as document:
+        if document.page_count == 0:
+            raise ValueError("PowerPoint presentation contains no slides")
+
+        first_page = document[0]
+        presentation = Presentation()
+        presentation.slide_width = int(first_page.rect.width / 72 * 914400)
+        presentation.slide_height = int(first_page.rect.height / 72 * 914400)
+        blank_layout = presentation.slide_layouts[6]
+
+        with tempfile.TemporaryDirectory(prefix="mypdf-ppt-images-") as temp_dir:
+            for index, page in enumerate(document):
+                image_path = Path(temp_dir) / f"slide-{index + 1}.png"
+                page.get_pixmap(matrix=fitz.Matrix(2.5, 2.5), alpha=False).save(str(image_path))
+                slide = presentation.slides.add_slide(blank_layout)
+                slide.shapes.add_picture(
+                    str(image_path),
+                    0,
+                    0,
+                    width=presentation.slide_width,
+                    height=presentation.slide_height,
+                )
+
+            output = io.BytesIO()
+            presentation.save(output)
+            return output.getvalue()
 
 # Helper to ensure fonts
 try:

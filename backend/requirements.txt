@@ -10,3 +10,4 @@ reportlab==4.2.5
 PyMuPDF==1.26.5
 pytesseract==0.3.13
 python-magic==0.4.27
+python-pptx==1.0.2

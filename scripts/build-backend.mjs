@@ -27,6 +27,7 @@ const args = [
   '--collect-data', 'fitz',
   '--collect-binaries', 'pikepdf',
   '--collect-data', 'pikepdf',
+  '--collect-data', 'pptx',
   '--hidden-import', 'app.main',
   '--hidden-import', 'app.api.pdf_routes',
   'backend/desktop_main.py'
