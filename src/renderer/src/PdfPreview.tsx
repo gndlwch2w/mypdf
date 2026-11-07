@@ -33,6 +33,16 @@ export function PowerPointThumbnail({ file }: { file: DesktopFile }): React.JSX.
   )
 }
 
+export function WordThumbnail({ file }: { file: DesktopFile }): React.JSX.Element {
+  return (
+    <div className="word-thumbnail" aria-label={file.name}>
+      <FiFileText />
+      <strong>{file.name.toLowerCase().endsWith('.docx') ? 'DOCX' : 'DOC'}</strong>
+      <span>Microsoft Word document</span>
+    </div>
+  )
+}
+
 export function loadPdf(file: DesktopFile): Promise<PDFDocumentProxy> {
   const cached = pdfCache.get(file.path)
   if (cached) return cached

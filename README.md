@@ -8,6 +8,7 @@ A local-first desktop PDF toolkit. Files are processed on the current device and
 - Add text, images, shapes, and freehand drawing to PDFs
 - Convert between PDFs and images
 - Export PowerPoint files as electronic PDFs, print PDFs, or flattened presentations
+- Export Word documents as electronic or print-quality PDFs
 - Extract embedded images from PDFs
 - Rotate pages and add watermarks or page numbers
 - Protect and unlock PDFs
@@ -25,9 +26,11 @@ A local-first desktop PDF toolkit. Files are processed on the current device and
 - Python 3.9+
 - npm
 - Tesseract (optional, required only for OCR)
-- LibreOffice (required for PowerPoint conversion)
+- LibreOffice (required for PowerPoint and Word conversion when Microsoft Office is unavailable)
 
 PowerPoint setup and usage: [docs/powerpoint-conversion.md](docs/powerpoint-conversion.md)
+
+Word setup and usage: [docs/word-conversion.md](docs/word-conversion.md)
 
 macOS / Linux:
 

@@ -6,6 +6,7 @@ export type ToolId =
   | 'images-to-pdf'
   | 'powerpoint'
   | 'edit'
+  | 'word'
   | 'rotate'
   | 'watermark'
   | 'unlock'

@@ -42,7 +42,7 @@ def _find_soffice() -> str:
     for candidate in candidates:
         if candidate and os.path.isfile(candidate):
             return candidate
-    raise ValueError("LibreOffice is required for PowerPoint conversion. Install it and restart MyPDF.")
+    raise ValueError("LibreOffice is required for Office document conversion. Install it and restart MyPDF.")
 
 
 def _powerpoint_to_pdf_macos(source_path: Path, pdf_path: Path) -> None:
@@ -110,6 +110,74 @@ def powerpoint_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "ele
         if result.returncode != 0 or not pdf_path.exists():
             detail = (result.stderr or result.stdout or "Unknown LibreOffice error").strip()
             raise ValueError(f"PowerPoint conversion failed: {detail}")
+        return pdf_path.read_bytes()
+
+
+def _word_to_pdf_macos(source_path: Path, pdf_path: Path) -> None:
+    """Use an installed Microsoft Word app for native macOS PDF export."""
+    word_app = Path("/Applications/Microsoft Word.app")
+    if not word_app.is_dir():
+        raise ValueError("Microsoft Word or LibreOffice is required for Word conversion")
+    script = [
+        "on run argv",
+        "set inputFile to POSIX file (item 1 of argv)",
+        "set outputFile to POSIX file (item 2 of argv)",
+        'tell application "Microsoft Word"',
+        "set wordDocument to open inputFile",
+        "save as wordDocument file name outputFile file format format PDF",
+        "close wordDocument saving no",
+        "end tell",
+        "end run",
+    ]
+    command = ["/usr/bin/osascript"]
+    for line in script:
+        command.extend(["-e", line])
+    command.extend([str(source_path), str(pdf_path)])
+    try:
+        result = subprocess.run(command, capture_output=True, text=True, timeout=180, check=False)
+    except subprocess.TimeoutExpired as error:
+        raise ValueError("Microsoft Word export timed out") from error
+    if result.returncode != 0 or not pdf_path.exists():
+        detail = (result.stderr or result.stdout or "Unknown Microsoft Word error").strip()
+        raise ValueError(f"Microsoft Word export failed: {detail}")
+
+
+def word_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "electronic") -> bytes:
+    """Render a Word document to PDF using a local Microsoft Word or LibreOffice installation."""
+    if quality not in {"electronic", "print"}:
+        raise ValueError("Word PDF quality must be electronic or print")
+    suffix = Path(filename).suffix.lower()
+    if suffix not in {".doc", ".docx"}:
+        raise ValueError("Word document must use the .doc or .docx extension")
+
+    with tempfile.TemporaryDirectory(prefix="mypdf-word-") as temp_dir:
+        source_path = Path(temp_dir) / f"document{suffix}"
+        source_path.write_bytes(file_data)
+        pdf_path = source_path.with_suffix(".pdf")
+        if sys.platform == "darwin" and Path("/Applications/Microsoft Word.app").is_dir():
+            _word_to_pdf_macos(source_path, pdf_path)
+            exported = pdf_path.read_bytes()
+            return compress_pdf_bytes(exported, "medium") if quality == "electronic" else exported
+
+        if quality == "electronic":
+            pdf_filter = 'pdf:writer_pdf_Export:{"Quality":{"type":"long","value":"85"},"ReduceImageResolution":{"type":"boolean","value":"true"},"MaxImageResolution":{"type":"long","value":"150"}}'
+        else:
+            pdf_filter = 'pdf:writer_pdf_Export:{"Quality":{"type":"long","value":"100"},"ReduceImageResolution":{"type":"boolean","value":"false"}}'
+
+        try:
+            result = subprocess.run(
+                [_find_soffice(), "--headless", "--convert-to", pdf_filter, "--outdir", temp_dir, str(source_path)],
+                capture_output=True,
+                text=True,
+                timeout=180,
+                check=False,
+            )
+        except subprocess.TimeoutExpired as error:
+            raise ValueError("Word conversion timed out") from error
+
+        if result.returncode != 0 or not pdf_path.exists():
+            detail = (result.stderr or result.stdout or "Unknown LibreOffice error").strip()
+            raise ValueError(f"Word conversion failed: {detail}")
         return pdf_path.read_bytes()
 
 

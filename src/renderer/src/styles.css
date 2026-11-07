@@ -3096,7 +3096,12 @@ button:disabled {
 .powerpoint-mode.selected { border-color: #d85b3f; background: #fff3ef; box-shadow: inset 0 0 0 1px #d85b3f; }
 .powerpoint-mode-grid > p { grid-column: 1 / -1; margin: 0; color: #8a9089; font-size: 10px; }
 
-.powerpoint-thumbnail {
+.word-mode-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.word-mode > svg { color: #2b579a; }
+.word-mode.selected { border-color: #2b579a; background: #eef4fc; box-shadow: inset 0 0 0 1px #2b579a; }
+
+.powerpoint-thumbnail,
+.word-thumbnail {
   display: flex;
   width: 100%;
   flex: 1;
@@ -3109,9 +3114,13 @@ button:disabled {
   background: #f5e7e2;
 }
 
-.powerpoint-thumbnail svg { width: 42px; height: 42px; }
-.powerpoint-thumbnail strong { font-size: 12px; }
-.powerpoint-thumbnail span { color: #7f7773; font-size: 10px; }
+.word-thumbnail { color: #2b579a; background: #e8eef8; }
+.powerpoint-thumbnail svg,
+.word-thumbnail svg { width: 42px; height: 42px; }
+.powerpoint-thumbnail strong,
+.word-thumbnail strong { font-size: 12px; }
+.powerpoint-thumbnail span,
+.word-thumbnail span { color: #7f7773; font-size: 10px; }
 
 .image-pdf-options {
   display: grid;

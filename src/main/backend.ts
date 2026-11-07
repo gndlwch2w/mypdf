@@ -25,6 +25,7 @@ const endpointByTool: Record<Exclude<ToolId, 'organize'>, string> = {
   'images-to-pdf': 'images-to-pdf',
   powerpoint: 'powerpoint',
   edit: 'edit',
+  word: 'word',
   rotate: 'rotate',
   watermark: 'watermark',
   unlock: 'unlock',
@@ -41,6 +42,7 @@ const defaultFilename: Record<ToolId, string> = {
   'images-to-pdf': 'converted.pdf',
   powerpoint: 'presentation.pdf',
   edit: 'edited.pdf',
+  word: 'document.pdf',
   rotate: 'rotated.pdf',
   watermark: 'watermarked.pdf',
   unlock: 'unlocked.pdf',
@@ -81,6 +83,7 @@ const outputSuffix: Record<ToolId, string> = {
   'images-to-pdf': 'images_to_pdf',
   powerpoint: 'powerpoint',
   edit: 'edited',
+  word: 'word',
   rotate: 'rotated',
   watermark: 'watermarked',
   unlock: 'unlocked',
@@ -100,6 +103,8 @@ function outputFilename(request: ProcessRequest, responseFilename?: string): str
     ? 'extracted_images'
     : request.tool === 'powerpoint'
       ? request.options.output_mode === 'flattened' ? 'flattened' : `${request.options.output_mode}_pdf`
+      : request.tool === 'word'
+        ? `${request.options.output_mode}_pdf`
       : outputSuffix[request.tool]
   return `${sourceStem}_${suffix}${extension}`
 }
@@ -221,10 +226,10 @@ export class BackendService {
 
   private async makeForm(request: ProcessRequest): Promise<FormData> {
     const form = new FormData()
-    const multiple = request.tool === 'merge' || request.tool === 'compress' || request.tool === 'images-to-pdf' || request.tool === 'powerpoint'
+    const multiple = request.tool === 'merge' || request.tool === 'compress' || request.tool === 'images-to-pdf' || request.tool === 'powerpoint' || request.tool === 'word'
 
     for (const file of multiple ? request.files : request.files.slice(0, 1)) {
-      const type = request.tool === 'images-to-pdf' || request.tool === 'powerpoint'
+      const type = request.tool === 'images-to-pdf' || request.tool === 'powerpoint' || request.tool === 'word'
         ? file.type || 'application/octet-stream'
         : 'application/pdf'
       form.append(multiple ? 'files' : 'file', fileBlob(await readFile(file.path), type), file.name)
