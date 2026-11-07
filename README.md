@@ -37,7 +37,7 @@ macOS / Linux:
 ```bash
 npm ci
 python3 -m venv .venv
-.venv/bin/python -m pip install -r backend/requirements.txt pyinstaller
+.venv/bin/python -m pip install -r backend/requirements.txt -r backend/requirements-build.txt
 ```
 
 Windows:
@@ -45,7 +45,7 @@ Windows:
 ```powershell
 npm ci
 py -3 -m venv .venv
-.venv\Scripts\python -m pip install -r backend\requirements.txt pyinstaller
+.venv\Scripts\python -m pip install -r backend\requirements.txt -r backend\requirements-build.txt
 ```
 
 ## Development

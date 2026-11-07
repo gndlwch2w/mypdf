@@ -1,5 +1,5 @@
 fastapi==0.115.0
-uvicorn[standard]==0.30.6
+uvicorn==0.30.6
 python-multipart==0.0.9
 pydantic==2.9.2
 pikepdf==9.0.0
@@ -9,5 +9,7 @@ Pillow==10.4.0
 reportlab==4.2.5
 PyMuPDF==1.26.5
 pytesseract==0.3.13
-python-magic==0.4.27
+# The frozen Windows magic.compat loader can hang indefinitely.
+# Windows uses Python-only file signatures instead.
+python-magic==0.4.27; sys_platform != "win32"
 python-pptx==1.0.2

@@ -1,0 +1,125 @@
+name: Windows backend
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'scripts/build-backend.mjs'
+      - 'scripts/trace-pyinstaller.py'
+      - '.github/workflows/windows-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freeze-and-smoke-test:
+    name: Freeze and smoke test
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-build.txt
+
+      - name: Install backend dependencies
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install -r backend\requirements.txt -r backend\requirements-build.txt
+
+      - name: Test MIME signatures without libmagic
+        shell: pwsh
+        run: .venv\Scripts\python.exe -m unittest discover -s backend/tests -p 'test_*.py' -v
+
+      - name: Freeze backend (trace Windows imports and DLLs)
+        run: node scripts/build-backend.mjs
+        env:
+          MYPDF_PYINSTALLER_TRACE: '1'
+          MYPDF_PYINSTALLER_TIMEOUT_MS: '480000'
+
+      - name: Start frozen backend and check health
+        shell: pwsh
+        env:
+          MYPDF_DEBUG_STARTUP: '1'
+          MYPDF_LOG_FILE: ''
+        run: |
+          $env:MYPDF_PORT = '58169'
+          $backend = Start-Process -FilePath 'backend\dist\mypdf-backend.exe' -PassThru -NoNewWindow
+          $healthy = $false
+          $lastFailure = 'No response yet'
+          try {
+            for ($attempt = 1; $attempt -le 40; $attempt++) {
+              if ($backend.HasExited) {
+                throw "Frozen backend exited with code $($backend.ExitCode)"
+              }
+              try {
+                $status = Invoke-RestMethod -Uri 'http://127.0.0.1:58169/api/status' -TimeoutSec 2
+                Write-Host "Health response: $($status | ConvertTo-Json -Compress -Depth 5)"
+                if ($status.status -eq 'healthy') {
+                  $healthy = $true
+                } else {
+                  $lastFailure = "Backend reported status: $($status.status)"
+                }
+                break
+              } catch {
+                $lastFailure = $_.Exception.Message
+                if ($attempt % 5 -eq 0) {
+                  Write-Host "Health attempt $attempt failed: $lastFailure"
+                }
+              }
+              Start-Sleep -Seconds 2
+            }
+            if (-not $healthy) {
+              throw "Frozen backend was not healthy: $lastFailure"
+            }
+          } finally {
+            # PyInstaller onefile runs a parent bootloader and a child process.
+            # Both retain an open handle to the exe on Windows if only the
+            # original PID is terminated.
+            Get-Process -Name 'mypdf-backend' -ErrorAction SilentlyContinue |
+              Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
+          }
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Windows NSIS installer (production path)
+        run: npm run package:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MYPDF_PYINSTALLER_CLEAN: '1'
+          MYPDF_PYINSTALLER_TIMEOUT_MS: '480000'
+
+      - name: Verify Windows installer
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem -Path 'release' -Filter '*.exe' -File -ErrorAction SilentlyContinue)
+          if ($installers.Count -eq 0) {
+            throw 'Windows NSIS installer was not produced'
+          }
+          $installers | ForEach-Object { Write-Host "Built installer: $($_.Name) ($($_.Length) bytes)" }
+
+      - name: Upload Windows installer for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-pr
+          path: release/*.exe
+          if-no-files-found: error

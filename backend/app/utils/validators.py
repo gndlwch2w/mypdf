@@ -129,6 +129,25 @@ class FileValidator:
         return files_data
     
     @staticmethod
+    def _detect_signature_mime(data: bytes) -> Optional[str]:
+        """Recognize supported PDF/image formats without an OS-specific DLL."""
+        if b"%PDF-" in data[:1024]:
+            return "application/pdf"
+        if data.startswith(b"\xff\xd8\xff"):
+            return "image/jpeg"
+        if data.startswith(b"\x89PNG\r\n\x1a\n"):
+            return "image/png"
+        if data.startswith((b"GIF87a", b"GIF89a")):
+            return "image/gif"
+        if data.startswith(b"BM"):
+            return "image/bmp"
+        if data.startswith((b"II*\x00", b"MM\x00*", b"II+\x00", b"MM\x00+")):
+            return "image/tiff"
+        if data.startswith(b"RIFF") and data[8:12] == b"WEBP":
+            return "image/webp"
+        return None
+
+    @staticmethod
     async def _validate_file(
         file: UploadFile, 
         supported_types: dict, 
@@ -178,18 +197,22 @@ class FileValidator:
         if len(data) == 0:
             raise InvalidFileError("Empty file")
         
-        # Validate MIME type if magic is available
+        # Use libmagic on Unix-like systems and a DLL-free signature fallback
+        # on Windows. Never silently accept an unknown or mismatched file type.
+        detected_mime = None
         if MAGIC_AVAILABLE:
             try:
                 detected_mime = magic.from_buffer(data, mime=True)
-                if detected_mime not in supported_types:
-                    raise InvalidFileError(
-                        f"Invalid {file_type_name} file. Detected type: {detected_mime}"
-                    )
             except Exception as e:
                 logger.warning(f"MIME type detection failed for {file.filename}: {e}")
-                # Continue without MIME validation if magic fails
-        
+        if detected_mime is None:
+            detected_mime = FileValidator._detect_signature_mime(data)
+
+        if detected_mime not in supported_types:
+            raise InvalidFileError(
+                f"Invalid {file_type_name} file. Detected type: {detected_mime or 'unknown'}"
+            )
+
         return data
 
 
