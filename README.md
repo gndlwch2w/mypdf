@@ -46,6 +46,9 @@ py -3 -m venv .venv
 npm run dev
 ```
 
+Branch, Pull Request, CI and release rules are documented in
+[CONTRIBUTING.md](CONTRIBUTING.md).
+
 Run only the Python API:
 
 ```bash
