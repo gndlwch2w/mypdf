@@ -90,9 +90,12 @@ jobs:
               throw "Frozen backend was not healthy: $lastFailure"
             }
           } finally {
-            if (-not $backend.HasExited) {
-              Stop-Process -Id $backend.Id -Force
-            }
+            # PyInstaller onefile runs a parent bootloader and a child process.
+            # Both retain an open handle to the exe on Windows if only the
+            # original PID is terminated.
+            Get-Process -Name 'mypdf-backend' -ErrorAction SilentlyContinue |
+              Stop-Process -Force -ErrorAction SilentlyContinue
+            Start-Sleep -Seconds 2
           }
 
       - name: Install Node dependencies
