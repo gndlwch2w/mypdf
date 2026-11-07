@@ -8,6 +8,7 @@ import {
   FiPlus,
   FiX
 } from 'react-icons/fi'
+import { LuPresentation } from 'react-icons/lu'
 import {
   GlobalWorkerOptions,
   getDocument,
@@ -21,6 +22,16 @@ import { pageNumberFontFamily, pageNumberMargin, pageNumberValue } from './pageN
 GlobalWorkerOptions.workerSrc = pdfWorker
 
 const pdfCache = new Map<string, Promise<PDFDocumentProxy>>()
+
+export function PowerPointThumbnail({ file }: { file: DesktopFile }): React.JSX.Element {
+  return (
+    <div className="powerpoint-thumbnail" aria-label={file.name}>
+      <LuPresentation />
+      <strong>{file.name.toLowerCase().endsWith('.pptx') ? 'PPTX' : 'PPT'}</strong>
+      <span>PowerPoint presentation</span>
+    </div>
+  )
+}
 
 function loadPdf(file: DesktopFile): Promise<PDFDocumentProxy> {
   const cached = pdfCache.get(file.path)

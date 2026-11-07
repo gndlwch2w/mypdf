@@ -12,7 +12,7 @@ import {
   FiShuffle,
   FiUnlock
 } from 'react-icons/fi'
-import { LuStamp } from 'react-icons/lu'
+import { LuPresentation, LuStamp } from 'react-icons/lu'
 import type { ToolId } from '../../shared/types'
 
 export interface ToolDefinition {
@@ -24,6 +24,7 @@ export interface ToolDefinition {
   accent: string
   multiple: boolean
   imageInput?: boolean
+  powerpointInput?: boolean
 }
 
 export const tools: ToolDefinition[] = [
@@ -72,6 +73,16 @@ export const tools: ToolDefinition[] = [
     accent: '#8b6fc7',
     multiple: true,
     imageInput: true
+  },
+  {
+    id: 'powerpoint',
+    title: 'PowerPoint converter',
+    shortTitle: 'PowerPoint',
+    description: 'Export a presentation as a PDF or a flattened image-only PowerPoint.',
+    icon: LuPresentation,
+    accent: '#d85b3f',
+    multiple: true,
+    powerpointInput: true
   },
   {
     id: 'rotate',

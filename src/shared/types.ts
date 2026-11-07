@@ -4,6 +4,7 @@ export type ToolId =
   | 'compress'
   | 'pdf-to-images'
   | 'images-to-pdf'
+  | 'powerpoint'
   | 'rotate'
   | 'watermark'
   | 'unlock'

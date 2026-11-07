@@ -23,6 +23,7 @@ const endpointByTool: Record<Exclude<ToolId, 'organize'>, string> = {
   compress: 'compress',
   'pdf-to-images': 'pdf-to-images',
   'images-to-pdf': 'images-to-pdf',
+  powerpoint: 'powerpoint',
   rotate: 'rotate',
   watermark: 'watermark',
   unlock: 'unlock',
@@ -37,6 +38,7 @@ const defaultFilename: Record<ToolId, string> = {
   compress: 'compressed.pdf',
   'pdf-to-images': 'pdf-images.zip',
   'images-to-pdf': 'converted.pdf',
+  powerpoint: 'presentation.pdf',
   rotate: 'rotated.pdf',
   watermark: 'watermarked.pdf',
   unlock: 'unlocked.pdf',
@@ -75,6 +77,7 @@ const outputSuffix: Record<ToolId, string> = {
   compress: 'compressed',
   'pdf-to-images': 'pdf_images',
   'images-to-pdf': 'images_to_pdf',
+  powerpoint: 'powerpoint',
   rotate: 'rotated',
   watermark: 'watermarked',
   unlock: 'unlocked',
@@ -92,7 +95,9 @@ function outputFilename(request: ProcessRequest, responseFilename?: string): str
   const extension = extname(responseFilename || fallback).toLowerCase() || extname(fallback)
   const suffix = request.tool === 'pdf-to-images' && request.options.mode === 'extract'
     ? 'extracted_images'
-    : outputSuffix[request.tool]
+    : request.tool === 'powerpoint'
+      ? request.options.output_mode === 'flattened' ? 'flattened' : `${request.options.output_mode}_pdf`
+      : outputSuffix[request.tool]
   return `${sourceStem}_${suffix}${extension}`
 }
 
@@ -213,10 +218,12 @@ export class BackendService {
 
   private async makeForm(request: ProcessRequest): Promise<FormData> {
     const form = new FormData()
-    const multiple = request.tool === 'merge' || request.tool === 'compress' || request.tool === 'images-to-pdf'
+    const multiple = request.tool === 'merge' || request.tool === 'compress' || request.tool === 'images-to-pdf' || request.tool === 'powerpoint'
 
     for (const file of multiple ? request.files : request.files.slice(0, 1)) {
-      const type = request.tool === 'images-to-pdf' ? file.type || 'application/octet-stream' : 'application/pdf'
+      const type = request.tool === 'images-to-pdf' || request.tool === 'powerpoint'
+        ? file.type || 'application/octet-stream'
+        : 'application/pdf'
       form.append(multiple ? 'files' : 'file', fileBlob(await readFile(file.path), type), file.name)
     }
 
