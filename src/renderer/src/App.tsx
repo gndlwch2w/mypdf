@@ -15,7 +15,7 @@ import type { DesktopFile, OrganizePage, PdfEditAsset, PdfEditDocument, ToolId }
 import PdfEditor from './editor/PdfEditor'
 import OrganizePages from './OrganizePages'
 import PageNumberPages from './PageNumberPages'
-import { ImageThumbnail, PdfThumbnail, PowerPointThumbnail, PreviewModal } from './PdfPreview'
+import { ImageThumbnail, PdfThumbnail, PowerPointThumbnail, PreviewModal, WordThumbnail } from './PdfPreview'
 import RotatePages from './RotatePages'
 import SplitPages from './SplitPages'
 import ToolOptions, { defaultOptions } from './ToolOptions'
@@ -89,6 +89,7 @@ export default function App(): React.JSX.Element {
     'pdf-to-images',
     'images-to-pdf',
     'powerpoint',
+    'word',
     'rotate',
     'watermark',
     'protect',
@@ -174,6 +175,8 @@ export default function App(): React.JSX.Element {
         ? file.type.startsWith('image/')
         : activeTool.powerpointInput
           ? file.name.toLowerCase().endsWith('.ppt') || file.name.toLowerCase().endsWith('.pptx')
+          : activeTool.wordInput
+            ? file.name.toLowerCase().endsWith('.doc') || file.name.toLowerCase().endsWith('.docx')
           : file.type === 'application/pdf'
     )
     if (accepted.length !== next.length) {
@@ -181,6 +184,8 @@ export default function App(): React.JSX.Element {
         ? 'Only supported image files can be added.'
         : activeTool.powerpointInput
           ? 'Only PPT and PPTX files can be added.'
+          : activeTool.wordInput
+            ? 'Only DOC and DOCX files can be added.'
           : 'Only PDF files can be added.')
     } else {
       setError('')
@@ -238,6 +243,7 @@ export default function App(): React.JSX.Element {
       const action = options.output_mode === 'flattened' ? 'Create flattened PowerPoint' : 'Export PDF'
       return files.length > 1 ? `${action} · ${files.length} files` : action
     }
+    if (selectedTool === 'word') return files.length > 1 ? `Export PDF · ${files.length} files` : 'Export PDF'
     if (selectedTool === 'organize') return 'Save organized PDF'
     if (selectedTool === 'rotate' && rotatePages.length > 0) return `Rotate ${rotatePages.length} ${rotatePages.length === 1 ? 'page' : 'pages'}`
     return activeTool.title
@@ -251,6 +257,7 @@ export default function App(): React.JSX.Element {
     if (selectedTool === 'watermark') return 'Preview the watermark on each page while you adjust its appearance and range.'
     if (selectedTool === 'pagenum') return 'Every page is shown with its final number and text styling.'
     if (selectedTool === 'powerpoint') return 'Choose a PDF quality or create an image-only PowerPoint with full-slide images.'
+    if (selectedTool === 'word') return 'Choose an electronic PDF for sharing or a high-quality PDF for printing.'
     return activeTool!.multiple
       ? 'Add files, preview them, then drag one onto another to swap their order.'
       : 'Add a file and click its thumbnail to inspect every page.'
@@ -382,7 +389,7 @@ export default function App(): React.JSX.Element {
               <p>Merge, convert, protect and organize documents with a fast native workspace. Your files never leave this computer.</p>
             </section>
             <section className="tools-section">
-              <div className="section-heading"><div><span>14 LOCAL TOOLS</span><h2>What would you like to do?</h2></div></div>
+              <div className="section-heading"><div><span>{tools.length} LOCAL TOOLS</span><h2>What would you like to do?</h2></div></div>
               <div className="tool-grid">
                 {tools.map((tool) => {
                   const Icon = tool.icon
@@ -458,10 +465,10 @@ export default function App(): React.JSX.Element {
                 {files.length === 0 ? (
                   <button type="button" className="empty-dropzone" onClick={() => void browse()}>
                     <div className="upload-icon"><FiUploadCloud /></div>
-                    <h2>Drop {activeTool!.imageInput ? 'images' : activeTool!.powerpointInput ? 'a PowerPoint file' : 'PDF files'} here</h2>
+                    <h2>Drop {activeTool!.imageInput ? 'images' : activeTool!.powerpointInput ? 'a PowerPoint file' : activeTool!.wordInput ? 'Word documents' : 'PDF files'} here</h2>
                     <p>or select them from your Mac</p>
                     <span>Choose files</span>
-                    <small>{activeTool!.imageInput ? 'JPG, PNG, WebP, TIFF and BMP' : activeTool!.powerpointInput ? 'PPT and PPTX · LibreOffice required' : 'PDF documents · up to 50 MB each'}</small>
+                    <small>{activeTool!.imageInput ? 'JPG, PNG, WebP, TIFF and BMP' : activeTool!.powerpointInput ? 'PPT and PPTX · Microsoft PowerPoint or LibreOffice required' : activeTool!.wordInput ? 'DOC and DOCX · Microsoft Word or LibreOffice required' : 'PDF documents · up to 50 MB each'}</small>
                   </button>
                 ) : (
                   selectedTool === 'organize' ? (
@@ -567,6 +574,8 @@ export default function App(): React.JSX.Element {
                           ? <ImageThumbnail file={file} pdfOptions={selectedTool === 'images-to-pdf' ? options : undefined} onOpen={() => setPreviewTarget({ file })} />
                           : activeTool!.powerpointInput
                             ? <PowerPointThumbnail file={file} />
+                            : activeTool!.wordInput
+                              ? <WordThumbnail file={file} />
                           : <PdfThumbnail file={file} onOpen={() => setPreviewTarget({ file })} />}
                         <div className="file-card-info">
                           <div><strong title={file.name}>{file.name}</strong><span>{formatBytes(file.size)}</span></div>

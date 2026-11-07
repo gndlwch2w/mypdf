@@ -645,6 +645,62 @@ async def convert_powerpoint(
     except Exception as error:
         raise create_error_response(error, "PowerPoint conversion")
 
+
+@router.post("/word")
+async def convert_word(
+    files: List[UploadFile] = File(...),
+    output_mode: str = Form("electronic"),
+):
+    """Batch export DOC/DOCX files to electronic or print-quality PDFs."""
+    try:
+        if not files:
+            raise InvalidFileError("Add at least one Word document")
+        if len(files) > settings.max_files_count:
+            raise ValidationError(f"A maximum of {settings.max_files_count} files can be processed at once")
+        if output_mode not in {"electronic", "print"}:
+            raise ValidationError("Invalid Word output mode")
+
+        outputs = []
+        used_names = set()
+        for index, file in enumerate(files):
+            filename = Path(file.filename or f"document-{index + 1}.docx").name
+            if Path(filename).suffix.lower() not in {".doc", ".docx"}:
+                raise InvalidFileError(f"{filename} must use the .doc or .docx extension")
+            file_data = await file.read()
+            if not file_data:
+                raise InvalidFileError(f"{filename} is empty")
+            if len(file_data) > settings.max_file_size_bytes:
+                raise FileSizeError(f"{filename} exceeds the {settings.max_file_size_mb}MB limit")
+
+            result = pdf_tools.word_to_pdf_bytes(file_data, filename, output_mode)
+            output_name = f"{Path(filename).stem}_{output_mode}.pdf"
+            if output_name.lower() in used_names:
+                output_name = f"{Path(filename).stem}_{output_mode}_{index + 1}.pdf"
+            used_names.add(output_name.lower())
+            outputs.append((output_name, result))
+
+        if len(outputs) > 1:
+            archive = io.BytesIO()
+            with zipfile.ZipFile(archive, "w", zipfile.ZIP_DEFLATED) as zip_file:
+                for output_name, result in outputs:
+                    zip_file.writestr(output_name, result)
+            result = archive.getvalue()
+            media_type = "application/zip"
+            output_name = "word-batch.zip"
+        else:
+            output_name, result = outputs[0]
+            media_type = "application/pdf"
+
+        return StreamingResponse(
+            io.BytesIO(result),
+            media_type=media_type,
+            headers={"Content-Disposition": f"attachment; filename={output_name}"},
+        )
+    except (InvalidFileError, FileSizeError, ValidationError, ValueError) as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except Exception as error:
+        raise create_error_response(error, "Word conversion")
+
 # Health check endpoint for PDF service
 @router.get("/health", response_model=HealthResponse)
 async def health_check():

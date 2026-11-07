@@ -26,6 +26,7 @@ export interface ToolDefinition {
   multiple: boolean
   imageInput?: boolean
   powerpointInput?: boolean
+  wordInput?: boolean
 }
 
 export const tools: ToolDefinition[] = [
@@ -93,6 +94,16 @@ export const tools: ToolDefinition[] = [
     icon: FiEdit3,
     accent: '#4f8a70',
     multiple: false
+  },
+  {
+    id: 'word',
+    title: 'Word to PDF',
+    shortTitle: 'Word to PDF',
+    description: 'Export Word documents as electronic or print-quality PDFs.',
+    icon: FiFileText,
+    accent: '#2b579a',
+    multiple: true,
+    wordInput: true
   },
   {
     id: 'rotate',

@@ -102,6 +102,8 @@ export function defaultOptions(tool: ToolId): Record<string, string> {
       return { page_size: 'A4', orientation: 'portrait', margin: 'none' }
     case 'powerpoint':
       return { output_mode: 'electronic' }
+    case 'word':
+      return { output_mode: 'electronic' }
     case 'rotate':
       return { angle: '90' }
     case 'watermark':
@@ -303,6 +305,23 @@ export default function ToolOptions({
           </button>
         ))}
         <p>Conversion runs locally through LibreOffice. No presentation is uploaded.</p>
+      </div>
+    )
+  }
+  if (tool === 'word') {
+    const modes = [
+      ['electronic', 'Electronic PDF', 'Optimized for sharing, screens and accessibility.', FiMonitor],
+      ['print', 'Print PDF', 'Higher quality for printing.', FiPrinter]
+    ] as const
+    return (
+      <div className="powerpoint-mode-grid word-mode-grid">
+        {modes.map(([value, title, detail, Icon]) => (
+          <button className={`powerpoint-mode word-mode ${options.output_mode === value ? 'selected' : ''}`} type="button" key={value} onClick={() => onChange('output_mode', value)}>
+            <Icon />
+            <span><strong>{title}</strong><small>{detail}</small></span>
+          </button>
+        ))}
+        <p>Conversion runs locally through Microsoft Word or LibreOffice. No document is uploaded.</p>
       </div>
     )
   }

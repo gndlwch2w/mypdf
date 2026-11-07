@@ -10,12 +10,15 @@ let mainWindow: BrowserWindow | null = null
 
 const imageExtensions = new Set(['.jpg', '.jpeg', '.png', '.bmp', '.tif', '.tiff', '.gif', '.webp'])
 const powerpointExtensions = new Set(['.ppt', '.pptx'])
+const wordExtensions = new Set(['.doc', '.docx'])
 
 function mimeForPath(path: string): string {
   const extension = extname(path).toLowerCase()
   if (extension === '.pdf') return 'application/pdf'
   if (extension === '.ppt') return 'application/vnd.ms-powerpoint'
   if (extension === '.pptx') return 'application/vnd.openxmlformats-officedocument.presentationml.presentation'
+  if (extension === '.doc') return 'application/msword'
+  if (extension === '.docx') return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document'
   if (extension === '.png') return 'image/png'
   if (extension === '.jpg' || extension === '.jpeg') return 'image/jpeg'
   if (extension === '.webp') return 'image/webp'
@@ -76,13 +79,16 @@ function registerIpc(): void {
   ipcMain.handle('dialog:select-files', async (_event, tool: ToolId) => {
     const images = tool === 'images-to-pdf'
     const powerpoint = tool === 'powerpoint'
-    const multiple = images || powerpoint || tool === 'merge' || tool === 'compress' || tool === 'rotate' || tool === 'organize'
+    const word = tool === 'word'
+    const multiple = images || powerpoint || word || tool === 'merge' || tool === 'compress' || tool === 'rotate' || tool === 'organize'
     const result = await dialog.showOpenDialog(mainWindow!, {
       properties: multiple ? ['openFile', 'multiSelections'] : ['openFile'],
       filters: images
         ? [{ name: 'Images', extensions: [...imageExtensions].map((value) => value.slice(1)) }]
         : powerpoint
           ? [{ name: 'PowerPoint presentations', extensions: [...powerpointExtensions].map((value) => value.slice(1)) }]
+          : word
+            ? [{ name: 'Word documents', extensions: [...wordExtensions].map((value) => value.slice(1)) }]
           : [{ name: 'PDF documents', extensions: ['pdf'] }]
     })
     if (result.canceled) return []
