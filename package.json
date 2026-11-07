@@ -17,9 +17,9 @@
     "rebuild:backend": "bash scripts/build-backend.sh --force",
     "build:mac": "npm run build:backend && npm run build:renderer && electron-builder --mac dir",
     "build:mac:clean": "npm run rebuild:backend && npm run build && electron-builder --mac dir",
-    "package:mac": "npm run rebuild:backend && npm run build && electron-builder --mac dmg",
-    "package:win": "npm run build:backend:portable && npm run build && electron-builder --win nsis",
-    "package:linux": "npm run build:backend:portable && npm run build && electron-builder --linux AppImage"
+    "package:mac": "npm run rebuild:backend && npm run build && electron-builder --mac dmg --publish never",
+    "package:win": "npm run build:backend:portable && npm run build && electron-builder --win nsis --publish never",
+    "package:linux": "npm run build:backend:portable && npm run build && electron-builder --linux AppImage --publish never"
   },
   "dependencies": {
     "@electron-toolkit/preload": "^3.0.2",
