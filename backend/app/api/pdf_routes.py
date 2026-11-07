@@ -2,6 +2,7 @@ from fastapi import APIRouter, UploadFile, File, Form, HTTPException, Depends
 from fastapi.responses import StreamingResponse, JSONResponse
 from typing import List, Optional
 import io
+import json
 import logging
 import asyncio
 import zipfile
@@ -299,6 +300,41 @@ async def add_watermark(
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise create_error_response(e, "Watermark addition")
+
+@router.post("/edit")
+async def edit_pdf(
+    file: UploadFile = File(...),
+    operations: str = Form(...),
+    assets: Optional[List[UploadFile]] = File(None),
+):
+    """Apply text, image, shape and drawing overlays to a PDF."""
+    try:
+        file_data = await FileValidator.validate_pdf_file(file)
+        try:
+            edit_document = json.loads(operations)
+        except json.JSONDecodeError as error:
+            raise ValidationError("Invalid PDF edit operations") from error
+
+        asset_data = {}
+        for asset in assets or []:
+            data = await asset.read()
+            if not data:
+                continue
+            asset_id = Path(asset.filename or "").stem
+            if asset_id:
+                asset_data[asset_id] = data
+
+        result = pdf_tools.edit_pdf_bytes(file_data, edit_document, asset_data)
+        return StreamingResponse(
+            io.BytesIO(result),
+            media_type="application/pdf",
+            headers={"Content-Disposition": "attachment; filename=edited.pdf"},
+        )
+    except (InvalidFileError, FileSizeError, ValidationError, ValueError) as error:
+        raise HTTPException(status_code=400, detail=str(error))
+    except Exception as error:
+        raise create_error_response(error, "PDF editing")
+
 
 @router.post("/pagenum")
 async def add_page_numbers(

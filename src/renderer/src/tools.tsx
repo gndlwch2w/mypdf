@@ -2,6 +2,7 @@ import type { IconType } from 'react-icons'
 import {
   FiFilePlus,
   FiFileText,
+  FiEdit3,
   FiHash,
   FiImage,
   FiLayers,
@@ -83,6 +84,15 @@ export const tools: ToolDefinition[] = [
     accent: '#d85b3f',
     multiple: true,
     powerpointInput: true
+  },
+  {
+    id: 'edit',
+    title: 'Edit PDF',
+    shortTitle: 'Edit PDF',
+    description: 'Add text, images, shapes and freehand drawing to a PDF.',
+    icon: FiEdit3,
+    accent: '#4f8a70',
+    multiple: false
   },
   {
     id: 'rotate',

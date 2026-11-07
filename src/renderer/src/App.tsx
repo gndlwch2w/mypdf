@@ -11,7 +11,8 @@ import {
   FiUploadCloud,
   FiX
 } from 'react-icons/fi'
-import type { DesktopFile, OrganizePage, ToolId } from '../../shared/types'
+import type { DesktopFile, OrganizePage, PdfEditAsset, PdfEditDocument, ToolId } from '../../shared/types'
+import PdfEditor from './editor/PdfEditor'
 import OrganizePages from './OrganizePages'
 import PageNumberPages from './PageNumberPages'
 import { ImageThumbnail, PdfThumbnail, PowerPointThumbnail, PreviewModal } from './PdfPreview'
@@ -312,6 +313,29 @@ export default function App(): React.JSX.Element {
     }
   }
 
+  async function saveEditedPdf(editorDocument: PdfEditDocument, editorAssets: PdfEditAsset[]): Promise<void> {
+    if (!files[0]) return
+    setProcessing(true)
+    setError('')
+    setResult(null)
+    try {
+      const response = await window.mypdf.process({
+        tool: 'edit',
+        files: [files[0]],
+        options: {},
+        editorDocument,
+        editorAssets
+      })
+      if (!response.cancelled && response.outputPath) {
+        setResult({ path: response.outputPath, detail: response.outputSize ? formatBytes(response.outputSize) : undefined })
+      }
+    } catch (reason) {
+      setError(reason instanceof Error ? reason.message : String(reason))
+    } finally {
+      setProcessing(false)
+    }
+  }
+
   return (
     <div className="app-shell">
       <div className="titlebar">
@@ -358,7 +382,7 @@ export default function App(): React.JSX.Element {
               <p>Merge, convert, protect and organize documents with a fast native workspace. Your files never leave this computer.</p>
             </section>
             <section className="tools-section">
-              <div className="section-heading"><div><span>13 LOCAL TOOLS</span><h2>What would you like to do?</h2></div></div>
+              <div className="section-heading"><div><span>14 LOCAL TOOLS</span><h2>What would you like to do?</h2></div></div>
               <div className="tool-grid">
                 {tools.map((tool) => {
                   const Icon = tool.icon
@@ -379,6 +403,34 @@ export default function App(): React.JSX.Element {
               <div><span>PDF TOOL</span><h1>{activeTool!.title}</h1><p>{activeTool!.description}</p></div>
             </header>
 
+            {selectedTool === 'edit' && files.length > 0 ? (
+              <div className="pdf-editor-workspace">
+                <PdfEditor
+                  file={files[0]}
+                  saving={processing}
+                  onRemove={() => { setFiles([]); setError(''); setResult(null) }}
+                  onSave={(editorDocument, editorAssets) => void saveEditedPdf(editorDocument, editorAssets)}
+                />
+                {(error || result) && (
+                  <div className="pdf-editor-status">
+                    {error && (
+                      <div className="message error-message">
+                        <FiX aria-hidden="true" /><span>{error}</span>
+                        <button className="error-dismiss" type="button" aria-label="Dismiss error" onClick={() => setError('')}><FiX /></button>
+                      </div>
+                    )}
+                    {result && (
+                      <div className="message success-message">
+                        <FiCheck />
+                        <div><strong>Done — your edited PDF is ready.</strong>{result.detail && <span>{result.detail}</span>}</div>
+                        <button type="button" onClick={() => void window.mypdf.showItemInFolder(result.path)}><FiFolder /> Show in Finder</button>
+                        <button className="success-dismiss" type="button" aria-label="Dismiss result" onClick={() => setResult(null)}><FiX /></button>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+            ) : (
             <div className={`workspace-body ${hasOptions ? 'has-options' : ''}`}>
               <div className="workspace-pages-panel">
                 <div className="section-title-row">
@@ -597,6 +649,7 @@ export default function App(): React.JSX.Element {
                 </div>
               )}
             </div>
+            )}
           </div>
         )}
       </main>

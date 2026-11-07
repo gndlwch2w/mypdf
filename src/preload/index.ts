@@ -4,6 +4,7 @@ import type { DesktopFile, MyPdfApi, ProcessRequest, ToolId } from '../shared/ty
 const api: MyPdfApi = {
   selectFiles: (tool: ToolId) => ipcRenderer.invoke('dialog:select-files', tool),
   selectWatermarkImage: () => ipcRenderer.invoke('dialog:select-watermark-image'),
+  selectEditorImage: () => ipcRenderer.invoke('dialog:select-editor-image'),
   describeDroppedFiles: (paths: string[]) => ipcRenderer.invoke('files:describe', paths),
   getPathForFile: (file: File) => webUtils.getPathForFile(file),
   readFile: (file: DesktopFile) => ipcRenderer.invoke('files:read', file),

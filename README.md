@@ -5,6 +5,7 @@ A local-first desktop PDF toolkit. Files are processed on the current device and
 ## Features
 
 - Merge, split, compress, and organize PDFs
+- Add text, images, shapes, and freehand drawing to PDFs
 - Convert between PDFs and images
 - Export PowerPoint files as electronic PDFs, print PDFs, or flattened presentations
 - Extract embedded images from PDFs

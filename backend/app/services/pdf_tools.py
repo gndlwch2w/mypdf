@@ -1,5 +1,6 @@
 from typing import List, Optional, Dict, Tuple
 import io
+import math
 import os
 import shutil
 import subprocess
@@ -23,6 +24,11 @@ from pptx import Presentation
 
 # Configure logger
 logger = logging.getLogger(__name__)
+
+
+def _editor_color(value: str, fallback: str = "#333333") -> Tuple[float, float, float]:
+    color = value if isinstance(value, str) and len(value) == 7 and value.startswith("#") else fallback
+    return tuple(int(color[index:index + 2], 16) / 255 for index in (1, 3, 5))
 
 
 def _find_soffice() -> str:
@@ -1006,6 +1012,122 @@ def zip_named_files(name_bytes: Dict[str, bytes]) -> bytes:
     except Exception as e:
         logger.error(f"ZIP creation failed: {e}")
         raise ValueError(f"Failed to create ZIP file: {e}")
+
+
+def edit_pdf_bytes(file_data: bytes, edit_document: dict, assets: Dict[str, bytes]) -> bytes:
+    """Apply normalized overlay elements to a PDF."""
+    validate_pdf_data(file_data)
+    elements = edit_document.get("elements") if isinstance(edit_document, dict) else None
+    if not isinstance(elements, list):
+        raise ValueError("Invalid PDF edit document")
+    if len(elements) > 5000:
+        raise ValueError("Too many edit elements")
+
+    try:
+        with safe_fitz_document(file_data) as document:
+            for element in sorted(elements, key=lambda item: (int(item.get("page", 1)), int(item.get("zIndex", 0)))):
+                page_index = int(element.get("page", 1)) - 1
+                if page_index < 0 or page_index >= len(document):
+                    continue
+
+                page = document.load_page(page_index)
+                page_width = float(page.rect.width)
+                page_height = float(page.rect.height)
+                x = max(0.0, min(1.0, float(element.get("x", 0)))) * page_width
+                y = max(0.0, min(1.0, float(element.get("y", 0)))) * page_height
+                width = max(0.001, min(1.0, float(element.get("width", 0.1)))) * page_width
+                height = max(0.001, min(1.0, float(element.get("height", 0.1)))) * page_height
+                rect = fitz.Rect(x, y, min(page_width, x + width), min(page_height, y + height))
+                opacity = max(0.0, min(1.0, float(element.get("opacity", 1))))
+                element_type = element.get("type")
+
+                if element_type == "text":
+                    text = str(element.get("text", ""))
+                    if not text:
+                        continue
+                    family = element.get("fontFamily", "helvetica")
+                    bold = bool(element.get("bold", False))
+                    italic = bool(element.get("italic", False))
+                    font_map = {
+                        ("helvetica", False, False): "helv",
+                        ("helvetica", True, False): "hebo",
+                        ("helvetica", False, True): "heit",
+                        ("helvetica", True, True): "hebi",
+                        ("times", False, False): "tiro",
+                        ("times", True, False): "tibo",
+                        ("times", False, True): "tiit",
+                        ("times", True, True): "tibi",
+                        ("courier", False, False): "cour",
+                        ("courier", True, False): "cobo",
+                        ("courier", False, True): "coit",
+                        ("courier", True, True): "cobi",
+                    }
+                    font_name = "china-s" if any(ord(character) > 255 for character in text) else font_map.get((family, bold, italic), "helv")
+                    alignment = {"left": 0, "center": 1, "right": 2}.get(element.get("align"), 0)
+                    page.insert_textbox(
+                        rect,
+                        text,
+                        fontsize=max(6.0, min(144.0, float(element.get("fontSize", 18)))),
+                        fontname=font_name,
+                        color=_editor_color(element.get("color", "#333333")),
+                        align=alignment,
+                        lineheight=1.2,
+                        fill_opacity=opacity,
+                        overlay=True,
+                    )
+                    if element.get("underline"):
+                        underline_y = min(rect.y1, rect.y0 + float(element.get("fontSize", 18)) * 1.15)
+                        page.draw_line(
+                            fitz.Point(rect.x0, underline_y),
+                            fitz.Point(rect.x1, underline_y),
+                            color=_editor_color(element.get("color", "#333333")),
+                            width=max(0.6, float(element.get("fontSize", 18)) / 18),
+                            stroke_opacity=opacity,
+                            overlay=True,
+                        )
+                elif element_type == "image":
+                    asset = assets.get(str(element.get("assetId", "")))
+                    if asset:
+                        page.insert_image(rect, stream=asset, keep_proportion=True, overlay=True)
+                elif element_type == "shape":
+                    stroke = _editor_color(element.get("stroke", "#347759"))
+                    fill_value = element.get("fill", "transparent")
+                    fill = None if fill_value in {"", "transparent", "none"} else _editor_color(fill_value, "#edf6f0")
+                    line_width = max(0.5, min(30.0, float(element.get("strokeWidth", 2))))
+                    shape = element.get("shape", "rectangle")
+                    if shape == "rectangle":
+                        page.draw_rect(rect, color=stroke, fill=fill, width=line_width, stroke_opacity=opacity, fill_opacity=opacity, overlay=True)
+                    elif shape == "ellipse":
+                        page.draw_oval(rect, color=stroke, fill=fill, width=line_width, stroke_opacity=opacity, fill_opacity=opacity, overlay=True)
+                    else:
+                        start = fitz.Point(rect.x0, rect.y0)
+                        end = fitz.Point(rect.x1, rect.y1)
+                        page.draw_line(start, end, color=stroke, width=line_width, stroke_opacity=opacity, overlay=True)
+                        if shape == "arrow":
+                            angle = math.atan2(end.y - start.y, end.x - start.x)
+                            arrow_size = max(7.0, line_width * 4.0)
+                            left = fitz.Point(end.x - arrow_size * math.cos(angle - 0.55), end.y - arrow_size * math.sin(angle - 0.55))
+                            right = fitz.Point(end.x - arrow_size * math.cos(angle + 0.55), end.y - arrow_size * math.sin(angle + 0.55))
+                            page.draw_polyline([left, end, right], color=stroke, width=line_width, stroke_opacity=opacity, overlay=True)
+                elif element_type == "drawing":
+                    raw_points = element.get("points", [])
+                    points = [
+                        fitz.Point(float(raw_points[index]) * page_width, float(raw_points[index + 1]) * page_height)
+                        for index in range(0, len(raw_points) - 1, 2)
+                    ]
+                    if len(points) >= 2:
+                        page.draw_polyline(
+                            points,
+                            color=_editor_color(element.get("stroke", "#347759")),
+                            width=max(0.5, min(30.0, float(element.get("strokeWidth", 3)))),
+                            stroke_opacity=opacity,
+                            overlay=True,
+                        )
+
+            return document.tobytes(garbage=4, deflate=True)
+    except Exception as error:
+        logger.error(f"PDF editing failed: {error}")
+        raise ValueError(f"Failed to edit PDF: {error}")
 
 
 def get_pdf_metadata_bytes(file_data: bytes) -> dict:
