@@ -23,9 +23,10 @@ const args = [
   '--distpath', 'backend/dist',
   '--workpath', 'backend/build',
   '--specpath', 'backend',
-  '--collect-all', 'fitz',
-  '--collect-all', 'pikepdf',
-  '--collect-all', 'pytesseract',
+  '--collect-binaries', 'fitz',
+  '--collect-data', 'fitz',
+  '--collect-binaries', 'pikepdf',
+  '--collect-data', 'pikepdf',
   '--hidden-import', 'app.main',
   '--hidden-import', 'app.api.pdf_routes',
   'backend/desktop_main.py'
