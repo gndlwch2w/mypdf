@@ -22,7 +22,7 @@ jobs:
             backend_python: .venv/bin/python
             package_glob: release/*.dmg
           - name: Windows
-            os: windows-latest
+            os: windows-2022
             command: package:win
             backend_python: .venv/Scripts/python.exe
             package_glob: release/*.exe
@@ -33,6 +33,7 @@ jobs:
             package_glob: release/*.AppImage
 
     runs-on: ${{ matrix.os }}
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
