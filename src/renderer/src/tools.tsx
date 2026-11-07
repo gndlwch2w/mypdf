@@ -78,8 +78,8 @@ export const tools: ToolDefinition[] = [
   },
   {
     id: 'powerpoint',
-    title: 'PowerPoint converter',
-    shortTitle: 'PowerPoint',
+    title: 'PowerPoint to PDF',
+    shortTitle: 'PPT to PDF',
     description: 'Export a presentation as a PDF or a flattened image-only PowerPoint.',
     icon: LuPresentation,
     accent: '#d85b3f',
