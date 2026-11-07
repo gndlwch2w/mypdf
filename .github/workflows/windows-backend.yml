@@ -44,6 +44,10 @@ jobs:
           .venv\Scripts\python.exe -m pip install --upgrade pip
           .venv\Scripts\python.exe -m pip install -r backend\requirements.txt -r backend\requirements-build.txt
 
+      - name: Test MIME signatures without libmagic
+        shell: pwsh
+        run: .venv\Scripts\python.exe -m unittest discover -s backend/tests -p 'test_*.py' -v
+
       - name: Freeze backend (trace Windows imports and DLLs)
         run: node scripts/build-backend.mjs
         env:

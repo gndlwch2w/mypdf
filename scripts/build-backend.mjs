@@ -29,6 +29,9 @@ const excludedModules = [
 ]
 
 const traceWindows = process.platform === 'win32' && process.env.MYPDF_PYINSTALLER_TRACE === '1'
+// Keep libmagic on other platforms; its frozen Windows loader blocks startup.
+if (process.platform === 'win32') excludedModules.push('magic')
+
 const args = [
   ...(traceWindows ? ['-u', 'scripts/trace-pyinstaller.py'] : ['-m', 'PyInstaller']),
   '--noconfirm',
