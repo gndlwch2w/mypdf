@@ -16,7 +16,7 @@ case "${1:-}" in
 esac
 
 if [[ ! -x "$python_bin" ]]; then
-  echo "Missing .venv. Run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt pyinstaller"
+  echo "Missing .venv. Run: python3 -m venv .venv && .venv/bin/pip install -r backend/requirements.txt -r backend/requirements-build.txt"
   exit 1
 fi
 
@@ -57,6 +57,7 @@ fi
 
 "$python_bin" -m PyInstaller \
   "${pyinstaller_flags[@]}" \
+  --noupx \
   --onefile \
   --name mypdf-backend \
   --paths backend \
@@ -70,6 +71,14 @@ fi
   --collect-data pptx \
   --hidden-import app.main \
   --hidden-import app.api.pdf_routes \
+  --exclude-module dotenv \
+  --exclude-module httptools \
+  --exclude-module tkinter \
+  --exclude-module tzdata \
+  --exclude-module uvloop \
+  --exclude-module watchfiles \
+  --exclude-module websockets \
+  --exclude-module yaml \
   backend/desktop_main.py
 
 mkdir -p "$(dirname "$stamp_file")"

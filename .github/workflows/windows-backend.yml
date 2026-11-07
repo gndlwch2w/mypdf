@@ -1,0 +1,77 @@
+name: Windows backend
+
+on:
+  pull_request:
+    branches: [main]
+    paths:
+      - 'backend/**'
+      - 'scripts/build-backend.mjs'
+      - '.github/workflows/windows-backend.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-backend-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  freeze-and-smoke-test:
+    name: Freeze and smoke test
+    runs-on: windows-2022
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: pip
+          cache-dependency-path: |
+            backend/requirements.txt
+            backend/requirements-build.txt
+
+      - name: Install backend dependencies
+        shell: pwsh
+        run: |
+          python -m venv .venv
+          .venv\Scripts\python.exe -m pip install --upgrade pip
+          .venv\Scripts\python.exe -m pip install -r backend\requirements.txt -r backend\requirements-build.txt
+
+      - name: Freeze backend
+        run: node scripts/build-backend.mjs
+
+      - name: Start frozen backend and check health
+        shell: pwsh
+        run: |
+          $env:MYPDF_PORT = '58169'
+          $backend = Start-Process -FilePath 'backend\dist\mypdf-backend.exe' -PassThru -NoNewWindow
+          $healthy = $false
+          try {
+            for ($attempt = 1; $attempt -le 45; $attempt++) {
+              if ($backend.HasExited) {
+                throw "Frozen backend exited with code $($backend.ExitCode)"
+              }
+              try {
+                $status = Invoke-RestMethod -Uri 'http://127.0.0.1:58169/api/status' -TimeoutSec 2
+                if ($status.status -eq 'healthy') {
+                  $healthy = $true
+                  break
+                }
+              } catch {
+                Start-Sleep -Seconds 2
+              }
+            }
+            if (-not $healthy) {
+              throw 'Frozen backend did not become healthy within 90 seconds'
+            }
+          } finally {
+            if (-not $backend.HasExited) {
+              Stop-Process -Id $backend.Id -Force
+            }
+          }
