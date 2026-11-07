@@ -94,3 +94,29 @@ jobs:
               Stop-Process -Id $backend.Id -Force
             }
           }
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Windows NSIS installer (production path)
+        run: npm run package:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+          MYPDF_PYINSTALLER_CLEAN: '1'
+          MYPDF_PYINSTALLER_TIMEOUT_MS: '480000'
+
+      - name: Verify Windows installer
+        shell: pwsh
+        run: |
+          $installers = @(Get-ChildItem -Path 'release' -Filter '*.exe' -File -ErrorAction SilentlyContinue)
+          if ($installers.Count -eq 0) {
+            throw 'Windows NSIS installer was not produced'
+          }
+          $installers | ForEach-Object { Write-Host "Built installer: $($_.Name) ($($_.Length) bytes)" }
+
+      - name: Upload Windows installer for review
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-installer-pr
+          path: release/*.exe
+          if-no-files-found: error
