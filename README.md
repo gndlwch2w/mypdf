@@ -64,6 +64,20 @@ PyInstaller cannot cross-compile the Python backend. Build on the target operati
 
 Each command builds the native Python backend, Electron frontend, and installer. Packages are unsigned by default. Public distribution requires Apple notarization, Windows code signing, or the appropriate Linux signing workflow.
 
+### Automatic GitHub releases
+
+Pushing a version tag starts native macOS, Windows and Linux builds and attaches
+the three installers to one GitHub Release:
+
+```bash
+git tag v0.2.0
+git push origin v0.2.0
+```
+
+Keep the tag aligned with the version in `package.json`. The workflow can also
+be run manually from the Actions page to test all three builds without creating
+a Release.
+
 ## Commands
 
 ```bash
