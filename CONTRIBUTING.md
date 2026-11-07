@@ -60,32 +60,18 @@ Follow semantic versioning:
 - `minor` for backward-compatible features, such as `0.2.2 → 0.3.0`
 - `major` for incompatible changes, such as `0.2.2 → 1.0.0`
 
-After all target Pull Requests are merged, create a release branch from the
-latest `main`. Update the version without creating a tag:
+After all target Pull Requests are merged, run one command from a clean `main`:
 
 ```bash
-git switch main
-git pull origin main
-git switch -c release/v0.3.0
-npm version minor --no-git-tag-version
-git add package.json package-lock.json
-git commit -m "chore: bump version to 0.3.0"
-git push -u origin release/v0.3.0
+npm run release:patch  # Bug fixes
+npm run release:minor  # Backward-compatible features
+npm run release:major  # Breaking changes
 ```
 
-Open a Pull Request from `release/v0.3.0` to `main`. After CI passes, use
-Squash merge. Then update local `main` and tag the merged commit:
-
-```bash
-git switch main
-git pull origin main
-git tag -a v0.3.0 -m "Release v0.3.0"
-git push origin v0.3.0
-```
-
-The tag triggers native macOS, Windows, and Linux builds and creates a GitHub
-Release. Never commit directly to protected `main`, and never delete, overwrite,
-or move a published tag. Publish a new version for later fixes.
+The script calculates the next version, creates and pushes the release branch,
+and prints the Pull Request URL. After CI passes, Squash merge the PR. GitHub
+Actions then tags the merged commit and starts the macOS, Windows, and Linux
+release build automatically. Never delete, overwrite, or move a published tag.
 
 ## 5. CI
 

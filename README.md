@@ -73,17 +73,17 @@ Each command builds the native Python backend, Electron frontend, and installer.
 
 ### Automatic GitHub releases
 
-Pushing a version tag starts native macOS, Windows and Linux builds and attaches
-the three installers to one GitHub Release:
+Prepare a release with one command:
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+npm run release:patch
+# or: npm run release:minor
+# or: npm run release:major
 ```
 
-Keep the tag aligned with the version in `package.json`. The workflow can also
-be run manually from the Actions page to test all three builds without creating
-a Release.
+The command calculates the version, pushes a release branch, and prints its PR
+URL. Merging that PR automatically creates the version tag and publishes native
+macOS, Windows, and Linux packages.
 
 ## Commands
 
