@@ -579,7 +579,13 @@ export default function App(): React.JSX.Element {
                     </section>
                   )}
 
-                  {error && <div className="message error-message"><FiX /><span>{error}</span></div>}
+                  {error && (
+                    <div className="message error-message">
+                      <FiX aria-hidden="true" />
+                      <span>{error}</span>
+                      <button className="error-dismiss" type="button" aria-label="Dismiss error" title="Close" onClick={() => setError('')}><FiX /></button>
+                    </div>
+                  )}
                   {result && (
                     <div className="message success-message">
                       <FiCheck />
