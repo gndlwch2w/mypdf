@@ -8,6 +8,7 @@ import asyncio
 import zipfile
 from datetime import datetime
 from pathlib import Path
+from urllib.parse import quote
 
 from ..services import pdf_tools
 from ..config.settings import settings
@@ -29,6 +30,17 @@ from ..exceptions.custom_exceptions import (
 # Configure router logger
 logger = logging.getLogger(__name__)
 router = APIRouter()
+
+
+def attachment_disposition(filename: str) -> str:
+    """Build an ASCII-safe attachment header while preserving a UTF-8 filename."""
+    extension = "".join(
+        character
+        for character in Path(filename).suffix
+        if character.isascii() and (character.isalnum() or character == ".")
+    )
+    fallback = f"download{extension}"
+    return f"attachment; filename=\"{fallback}\"; filename*=UTF-8''{quote(filename, safe='')}"
 
 # Dependency injection functions for validation
 async def validate_single_pdf(file: UploadFile = File(...)) -> bytes:
@@ -638,7 +650,7 @@ async def convert_powerpoint(
         return StreamingResponse(
             io.BytesIO(result),
             media_type=media_type,
-            headers={"Content-Disposition": f"attachment; filename={output_name}"},
+            headers={"Content-Disposition": attachment_disposition(output_name)},
         )
     except (InvalidFileError, FileSizeError, ValidationError, ValueError) as error:
         raise HTTPException(status_code=400, detail=str(error))
@@ -694,7 +706,7 @@ async def convert_word(
         return StreamingResponse(
             io.BytesIO(result),
             media_type=media_type,
-            headers={"Content-Disposition": f"attachment; filename={output_name}"},
+            headers={"Content-Disposition": attachment_disposition(output_name)},
         )
     except (InvalidFileError, FileSizeError, ValidationError, ValueError) as error:
         raise HTTPException(status_code=400, detail=str(error))

@@ -14,7 +14,7 @@ or Python to control Microsoft PowerPoint when prompted.
 
 ## Usage
 
-1. Open **PowerPoint converter**.
+1. Open **PowerPoint to PDF**.
 2. Add one or more `.ppt` or `.pptx` files.
 3. Choose an output:
    - **Electronic PDF:** compressed for sharing and screens.
