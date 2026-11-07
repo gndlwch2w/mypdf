@@ -205,8 +205,13 @@ select:focus-visible {
 }
 
 .sidebar nav > p {
-  margin: 0 0 6px 11px;
+  position: sticky;
+  z-index: 2;
+  top: 0;
+  margin: 0;
+  padding: 0 11px 7px;
   color: #9b9d96;
+  background: #efeee8;
   font-size: 9px;
   font-weight: 700;
   letter-spacing: 0.13em;
@@ -3789,6 +3794,34 @@ button:disabled {
   width: min(620px, 100%);
   margin-right: 0;
   margin-left: auto;
+}
+
+.workspace-bottom-dock .error-message {
+  width: min(620px, 100%);
+  margin-right: 0;
+  margin-left: auto;
+}
+
+.error-message > span { flex: 1; }
+
+.error-message .error-dismiss {
+  display: grid;
+  width: 32px;
+  height: 32px;
+  flex: 0 0 32px;
+  padding: 0;
+  place-items: center;
+  border: 1px solid #ebc5c1;
+  border-radius: 8px;
+  color: #9a443e;
+  background: rgba(255, 255, 255, 0.62);
+  cursor: pointer;
+}
+
+.error-message .error-dismiss:hover {
+  color: #7d2f2a;
+  border-color: #dca7a2;
+  background: #fff;
 }
 
 .options-collapse-button {
