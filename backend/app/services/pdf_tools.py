@@ -8,6 +8,7 @@ from reportlab.pdfgen import canvas
 from reportlab.lib.units import inch
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
+from reportlab.lib.utils import ImageReader
 from PIL import Image
 import pikepdf
 import fitz  # PyMuPDF
@@ -67,7 +68,7 @@ def safe_pikepdf_document(file_data: bytes):
                 logger.warning(f"Failed to close pikepdf document: {e}")
 
 
-def validate_pdf_data(file_data: bytes) -> None:
+def validate_pdf_data(file_data: bytes, allow_encrypted: bool = False) -> None:
     """Validate that the provided bytes represent a non-empty PDF file.
 
     Raises ValueError on invalid or empty data.
@@ -78,6 +79,10 @@ def validate_pdf_data(file_data: bytes) -> None:
     try:
         # Try to read with PyPDF2 to validate PDF format
         reader = PdfReader(io.BytesIO(file_data))
+        if reader.is_encrypted:
+            if allow_encrypted:
+                return
+            raise ValueError("PDF is encrypted")
         if len(reader.pages) == 0:
             raise ValueError("PDF contains no pages")
     except Exception as e:
@@ -184,19 +189,25 @@ def split_pdf_bytes(file_data: bytes, ranges: Optional[str]) -> Dict[str, bytes]
         raise ValueError(f"Failed to split PDF: {e}")
 
 
-def rotate_pdf_bytes(file_data: bytes, degrees: int) -> bytes:
-    """Rotate all pages in a PDF by degrees (90,180,270) and return new PDF bytes."""
+def rotate_pdf_bytes(file_data: bytes, degrees: int, selected_pages: Optional[List[int]] = None) -> bytes:
+    """Rotate all or selected pages in a PDF and return new PDF bytes."""
     validate_pdf_data(file_data)
     
-    if degrees not in [90, 180, 270]:
-        raise ValueError("Degrees must be 90, 180, or 270")
+    if degrees not in [0, 90, 180, 270]:
+        raise ValueError("Degrees must be 0, 90, 180, or 270")
     
     try:
         reader = PdfReader(io.BytesIO(file_data))
         writer = PdfWriter()
+        total_pages = len(reader.pages)
+        page_numbers = set(selected_pages) if selected_pages else None
+
+        if page_numbers and any(page < 1 or page > total_pages for page in page_numbers):
+            raise ValueError(f"Selected pages must be between 1 and {total_pages}")
         
-        for page in reader.pages:
-            page.rotate(degrees)
+        for page_number, page in enumerate(reader.pages, 1):
+            if degrees != 0 and (page_numbers is None or page_number in page_numbers):
+                page.rotate(degrees)
             writer.add_page(page)
         
         out = io.BytesIO()
@@ -273,24 +284,99 @@ def extract_text_bytes(file_data: bytes) -> str:
         raise ValueError(f"Failed to extract text: {e}")
 
 
-def _make_text_pdf(page_width: float, page_height: float, text: str, opacity: float = 0.2) -> bytes:
-    """Create a PDF with watermark text for overlay purposes."""
+def _watermark_font(font_family: str, bold: bool, italic: bool) -> str:
+    families = {
+        "helvetica": ("Helvetica", "Helvetica-Bold", "Helvetica-Oblique", "Helvetica-BoldOblique"),
+        "times": ("Times-Roman", "Times-Bold", "Times-Italic", "Times-BoldItalic"),
+        "courier": ("Courier", "Courier-Bold", "Courier-Oblique", "Courier-BoldOblique"),
+    }
+    normal, bold_name, italic_name, bold_italic = families.get(font_family, families["helvetica"])
+    if bold and italic:
+        return bold_italic
+    if bold:
+        return bold_name
+    if italic:
+        return italic_name
+    return normal
+
+
+def _make_watermark_pdf(
+    page_width: float,
+    page_height: float,
+    text: str,
+    image_data: Optional[bytes],
+    opacity: float,
+    position: str,
+    mosaic: bool,
+    rotation: int,
+    font_family: str,
+    font_size: int,
+    bold: bool,
+    italic: bool,
+    underline: bool,
+    color: str,
+) -> bytes:
+    """Create a single-page text or image watermark PDF."""
     try:
         buf = io.BytesIO()
         c = canvas.Canvas(buf, pagesize=(page_width, page_height))
-        c.saveState()
-        
-        # Set opacity and color
-        gray_value = max(0.0, min(1.0, 1.0 - opacity))
-        c.setFillGray(gray_value)
-        c.setFont("Helvetica", 48)
-        
-        # Position and rotation for watermark
-        c.translate(page_width/2, page_height/2)
-        c.rotate(45)
-        c.drawCentredString(0, 0, text)
-        
-        c.restoreState()
+
+        margin_x = page_width * 0.14
+        margin_y = page_height * 0.14
+        x_positions = {"left": margin_x, "center": page_width / 2, "right": page_width - margin_x}
+        y_positions = {"bottom": margin_y, "center": page_height / 2, "top": page_height - margin_y}
+        vertical, horizontal = position.split('-', 1) if '-' in position else ("center", "center")
+        points = [(x_positions.get(horizontal, page_width / 2), y_positions.get(vertical, page_height / 2))]
+        if mosaic:
+            points = [
+                (page_width * x_fraction, page_height * y_fraction)
+                for y_fraction in (0.2, 0.5, 0.8)
+                for x_fraction in (0.2, 0.5, 0.8)
+            ]
+
+        image_reader = None
+        image_width = image_height = 0.0
+        if image_data:
+            image = Image.open(io.BytesIO(image_data)).convert("RGBA")
+            alpha = image.getchannel("A").point(lambda value: int(value * opacity))
+            image.putalpha(alpha)
+            max_width = page_width * (0.22 if mosaic else 0.38)
+            max_height = page_height * (0.15 if mosaic else 0.28)
+            scale = min(max_width / image.width, max_height / image.height)
+            image_width, image_height = image.width * scale, image.height * scale
+            image_reader = ImageReader(image)
+
+        font_name = _watermark_font(font_family, bold, italic)
+        red = int(color[1:3], 16) / 255 if len(color) == 7 and color.startswith('#') else 0.35
+        green = int(color[3:5], 16) / 255 if len(color) == 7 and color.startswith('#') else 0.35
+        blue = int(color[5:7], 16) / 255 if len(color) == 7 and color.startswith('#') else 0.35
+
+        for x, y in points:
+            c.saveState()
+            c.translate(x, y)
+            c.rotate(rotation)
+            if image_reader:
+                c.drawImage(
+                    image_reader,
+                    -image_width / 2,
+                    -image_height / 2,
+                    width=image_width,
+                    height=image_height,
+                    mask='auto',
+                    preserveAspectRatio=True,
+                )
+            else:
+                c.setFillAlpha(opacity)
+                c.setFillColorRGB(red, green, blue)
+                c.setStrokeColorRGB(red, green, blue)
+                c.setFont(font_name, font_size)
+                c.drawCentredString(0, -font_size * 0.3, text)
+                if underline:
+                    text_width = pdfmetrics.stringWidth(text, font_name, font_size)
+                    c.setLineWidth(max(1, font_size / 18))
+                    c.line(-text_width / 2, -font_size * 0.42, text_width / 2, -font_size * 0.42)
+            c.restoreState()
+
         c.showPage()
         c.save()
         return buf.getvalue()
@@ -299,12 +385,29 @@ def _make_text_pdf(page_width: float, page_height: float, text: str, opacity: fl
         raise ValueError(f"Failed to create watermark: {e}")
 
 
-def add_text_watermark_bytes(file_data: bytes, text: str, opacity: float = 0.2) -> bytes:
-    """Add text watermark to all pages of a PDF."""
+def add_watermark_bytes(
+    file_data: bytes,
+    text: str = "",
+    image_data: Optional[bytes] = None,
+    opacity: float = 0.3,
+    position: str = "center-center",
+    mosaic: bool = False,
+    rotation: int = 45,
+    font_family: str = "helvetica",
+    font_size: int = 48,
+    bold: bool = False,
+    italic: bool = False,
+    underline: bool = False,
+    color: str = "#666666",
+    page_from: int = 1,
+    page_to: Optional[int] = None,
+    layer: str = "over",
+) -> bytes:
+    """Add a configurable text or image watermark to selected PDF pages."""
     validate_pdf_data(file_data)
-    
-    if not text or not text.strip():
-        raise ValueError("Watermark text cannot be empty")
+
+    if not image_data and not text.strip():
+        raise ValueError("Watermark text or image is required")
     
     if not 0.0 <= opacity <= 1.0:
         raise ValueError("Opacity must be between 0.0 and 1.0")
@@ -312,16 +415,30 @@ def add_text_watermark_bytes(file_data: bytes, text: str, opacity: float = 0.2) 
     try:
         reader = PdfReader(io.BytesIO(file_data))
         writer = PdfWriter()
+        total_pages = len(reader.pages)
+        last_page = min(page_to or total_pages, total_pages)
+        if page_from < 1 or page_from > last_page:
+            raise ValueError(f"Page range must be between 1 and {total_pages}")
         
-        for page in reader.pages:
+        for page_number, page in enumerate(reader.pages, 1):
+            if page_number < page_from or page_number > last_page:
+                writer.add_page(page)
+                continue
             w = float(page.mediabox.right)
             h = float(page.mediabox.top)
-            
-            overlay_pdf = _make_text_pdf(w, h, text.strip(), opacity)
+
+            overlay_pdf = _make_watermark_pdf(
+                w, h, text.strip(), image_data, opacity, position, mosaic, rotation,
+                font_family, font_size, bold, italic, underline, color,
+            )
             overlay_page = PdfReader(io.BytesIO(overlay_pdf)).pages[0]
-            
-            page.merge_page(overlay_page)
-            writer.add_page(page)
+
+            if layer == "below":
+                overlay_page.merge_page(page)
+                writer.add_page(overlay_page)
+            else:
+                page.merge_page(overlay_page)
+                writer.add_page(page)
         
         out = io.BytesIO()
         writer.write(out)
@@ -331,55 +448,120 @@ def add_text_watermark_bytes(file_data: bytes, text: str, opacity: float = 0.2) 
         raise ValueError(f"Failed to add watermark: {e}")
 
 
-def add_page_numbers_bytes(file_data: bytes, position: str = "bottom-right") -> bytes:
-    """Add page numbers to all pages of a PDF."""
+def add_text_watermark_bytes(file_data: bytes, text: str, opacity: float = 0.2) -> bytes:
+    """Backward-compatible text watermark helper."""
+    return add_watermark_bytes(file_data, text=text, opacity=opacity)
+
+
+def add_page_numbers_bytes(
+    file_data: bytes,
+    position: str = "bottom-right",
+    margin: str = "recommended",
+    first_number: int = 1,
+    page_from: int = 1,
+    page_to: Optional[int] = None,
+    text_format: str = "{n} / {p}",
+    font_family: str = "helvetica",
+    font_size: int = 12,
+    bold: bool = False,
+    italic: bool = False,
+    underline: bool = False,
+    color: str = "#333333",
+) -> bytes:
+    """Add positioned page numbers with configurable text and styling."""
     validate_pdf_data(file_data)
-    
-    valid_positions = ["bottom-right", "bottom-left", "top-right", "top-left", "bottom-center", "top-center"]
+
+    margin_points = {
+        "compact": 0.35 * inch,
+        "recommended": 0.55 * inch,
+        "spacious": 0.8 * inch,
+    }
+    if margin not in margin_points:
+        raise ValueError("Margin must be compact, recommended, or spacious")
+    valid_positions = {
+        "top-left", "top-center", "top-right",
+        "center-left", "center-center", "center-right",
+        "bottom-left", "bottom-center", "bottom-right",
+    }
     if position not in valid_positions:
-        raise ValueError(f"Position must be one of: {', '.join(valid_positions)}")
-    
+        raise ValueError("Invalid page number position")
+    if first_number < 1:
+        raise ValueError("First number must be 1 or greater")
+    if font_size < 6 or font_size > 72:
+        raise ValueError("Font size must be between 6 and 72")
+    if "{n}" not in text_format:
+        raise ValueError("Page number text must include {n}")
+
     try:
         reader = PdfReader(io.BytesIO(file_data))
         writer = PdfWriter()
         total = len(reader.pages)
-        
-        for i, page in enumerate(reader.pages, start=1):
+        last_page = min(page_to or total, total)
+        if page_from < 1 or page_from > last_page:
+            raise ValueError(f"Page range must be between 1 and {total}")
+
+        last_number = first_number + last_page - page_from
+        font_name = _watermark_font(font_family, bold, italic)
+        red = int(color[1:3], 16) / 255 if len(color) == 7 and color.startswith('#') else 0.2
+        green = int(color[3:5], 16) / 255 if len(color) == 7 and color.startswith('#') else 0.2
+        blue = int(color[5:7], 16) / 255 if len(color) == 7 and color.startswith('#') else 0.2
+
+        for page_number, page in enumerate(reader.pages, start=1):
+            if page_number < page_from or page_number > last_page:
+                writer.add_page(page)
+                continue
+
             w = float(page.mediabox.right)
             h = float(page.mediabox.top)
-            
+
             buf = io.BytesIO()
             c = canvas.Canvas(buf, pagesize=(w, h))
-            c.setFont("Helvetica", 12)
-            
-            # Calculate page number position
-            margin = 0.7 * inch
-            if position == "bottom-right":
-                x, y = w - margin, margin
-            elif position == "bottom-left":
-                x, y = margin, margin
-            elif position == "top-right":
-                x, y = w - margin, h - margin
-            elif position == "top-left":
-                x, y = margin, h - margin
-            elif position == "bottom-center":
-                x, y = w / 2, margin
-            elif position == "top-center":
-                x, y = w / 2, h - margin
-            
-            page_text = f"{i}/{total}"
-            if "center" in position:
+            c.setFillColorRGB(red, green, blue)
+            c.setStrokeColorRGB(red, green, blue)
+            c.setFont(font_name, font_size)
+
+            number = first_number + page_number - page_from
+            page_text = text_format.replace("{n}", str(number)).replace("{p}", str(last_number))
+            inset = margin_points[margin]
+            vertical, horizontal = position.split("-", 1)
+            if horizontal == "left":
+                x = inset
+            elif horizontal == "center":
+                x = w / 2
+            else:
+                x = w - inset
+
+            if vertical == "top":
+                y = h - inset - font_size
+            elif vertical == "center":
+                y = h / 2 - font_size * 0.35
+            else:
+                y = inset
+
+            if horizontal == "left":
+                c.drawString(x, y, page_text)
+            elif horizontal == "center":
                 c.drawCentredString(x, y, page_text)
             else:
-                c.drawString(x, y, page_text)
-            
+                c.drawRightString(x, y, page_text)
+            if underline:
+                text_width = pdfmetrics.stringWidth(page_text, font_name, font_size)
+                c.setLineWidth(max(0.6, font_size / 18))
+                if horizontal == "left":
+                    line_start, line_end = x, x + text_width
+                elif horizontal == "center":
+                    line_start, line_end = x - text_width / 2, x + text_width / 2
+                else:
+                    line_start, line_end = x - text_width, x
+                c.line(line_start, y - font_size * 0.18, line_end, y - font_size * 0.18)
+
             c.showPage()
             c.save()
-            
+
             overlay = PdfReader(io.BytesIO(buf.getvalue())).pages[0]
             page.merge_page(overlay)
             writer.add_page(page)
-        
+
         out = io.BytesIO()
         writer.write(out)
         return out.getvalue()
@@ -414,7 +596,7 @@ def protect_pdf_bytes(file_data: bytes, password: str) -> bytes:
 
 def unlock_pdf_bytes(file_data: bytes, password: str) -> bytes:
     """Remove password protection from a PDF file."""
-    validate_pdf_data(file_data)
+    validate_pdf_data(file_data, allow_encrypted=True)
     
     if not password:
         raise ValueError("Password cannot be empty")
@@ -440,12 +622,20 @@ def unlock_pdf_bytes(file_data: bytes, password: str) -> bytes:
         raise ValueError(f"Failed to unlock PDF: {e}")
 
 
-def images_to_pdf_bytes(images_data: List[bytes]) -> bytes:
+def images_to_pdf_bytes(images_data: List[bytes], page_size: str = "A4", orientation: str = "portrait", margin: str = "none") -> bytes:
     """Convert image files to a single PDF document."""
     if not images_data:
         raise ValueError("No image files provided")
     
     try:
+        valid_page_sizes = {"auto", "A4", "Letter", "Legal"}
+        if page_size not in valid_page_sizes:
+            raise ValueError(f"Page size must be one of: {', '.join(sorted(valid_page_sizes))}")
+        if orientation not in {"portrait", "landscape"}:
+            raise ValueError("Orientation must be portrait or landscape")
+        if margin not in {"none", "small", "big"}:
+            raise ValueError("Margin must be none, small or big")
+
         images = []
         for i, data in enumerate(images_data):
             try:
@@ -453,7 +643,24 @@ def images_to_pdf_bytes(images_data: List[bytes]) -> bytes:
                 # Convert to RGB mode for compatibility
                 if img.mode != 'RGB':
                     img = img.convert('RGB')
-                images.append(img)
+                if page_size == "auto":
+                    images.append(img)
+                    continue
+
+                dimensions = {
+                    "A4": (827, 1169),
+                    "Letter": (850, 1100),
+                    "Legal": (850, 1400),
+                }
+                width, height = dimensions[page_size]
+                if orientation == "landscape":
+                    width, height = height, width
+                inset = {"none": 0, "small": 40, "big": 90}[margin]
+                img.thumbnail((width - inset * 2, height - inset * 2), Image.Resampling.LANCZOS)
+                page = Image.new("RGB", (width, height), "white")
+                page.paste(img, ((width - img.width) // 2, (height - img.height) // 2))
+                img.close()
+                images.append(page)
             except Exception as e:
                 raise ValueError(f"Invalid image file {i+1}: {e}")
         
@@ -487,7 +694,7 @@ def images_to_pdf_bytes(images_data: List[bytes]) -> bytes:
         raise ValueError(f"Failed to convert images to PDF: {e}")
 
 
-def pdf_to_images_zip_bytes(file_data: bytes) -> bytes:
+def pdf_to_images_zip_bytes(file_data: bytes, image_format: str = "png", quality: str = "medium") -> bytes:
     """Convert PDF pages to PNG images and return as ZIP file."""
     validate_pdf_data(file_data)
     
@@ -498,14 +705,20 @@ def pdf_to_images_zip_bytes(file_data: bytes) -> bytes:
             
             zip_buf = io.BytesIO()
             
+            normalized_format = "jpg" if image_format in {"jpg", "jpeg"} else "png"
+            scale = {"low": 1.0, "medium": 2.0, "high": 3.0}.get(quality, 2.0)
+
             with zipfile.ZipFile(zip_buf, 'w', compression=zipfile.ZIP_DEFLATED) as z:
                 for page_num in range(len(doc)):
                     try:
                         page = doc.load_page(page_num)
-                        # Use 2x scaling for higher image quality
-                        pix = page.get_pixmap(matrix=fitz.Matrix(2, 2))
-                        img_data = pix.tobytes("png")
-                        z.writestr(f"page_{page_num + 1:03d}.png", img_data)
+                        pix = page.get_pixmap(matrix=fitz.Matrix(scale, scale), alpha=False)
+                        if normalized_format == "jpg":
+                            jpeg_quality = {"low": 60, "medium": 82, "high": 95}.get(quality, 82)
+                            img_data = pix.tobytes("jpeg", jpg_quality=jpeg_quality)
+                        else:
+                            img_data = pix.tobytes("png")
+                        z.writestr(f"page_{page_num + 1:03d}.{normalized_format}", img_data)
                     except Exception as e:
                         logger.warning(f"Failed to convert page {page_num + 1}: {e}")
                         continue
@@ -514,6 +727,67 @@ def pdf_to_images_zip_bytes(file_data: bytes) -> bytes:
     except Exception as e:
         logger.error(f"PDF to images conversion failed: {e}")
         raise ValueError(f"Failed to convert PDF to images: {e}")
+
+
+def extract_pdf_images_zip_bytes(file_data: bytes, image_format: str = "png", quality: str = "medium") -> bytes:
+    """Extract unique embedded raster images from a PDF and return them as a ZIP."""
+    validate_pdf_data(file_data)
+
+    try:
+        normalized_format = "jpg" if image_format in {"jpg", "jpeg"} else "png"
+        jpeg_quality = {"low": 60, "medium": 82, "high": 95}.get(quality, 82)
+        seen_xrefs = set()
+        extracted_count = 0
+        zip_buf = io.BytesIO()
+
+        with safe_fitz_document(file_data) as doc:
+            with zipfile.ZipFile(zip_buf, 'w', compression=zipfile.ZIP_DEFLATED) as archive:
+                for page_index in range(len(doc)):
+                    page = doc.load_page(page_index)
+                    for image_info in page.get_images(full=True):
+                        xref = image_info[0]
+                        if xref <= 0 or xref in seen_xrefs:
+                            continue
+                        seen_xrefs.add(xref)
+
+                        extracted = doc.extract_image(xref)
+                        image_bytes = extracted.get("image")
+                        if not image_bytes:
+                            continue
+
+                        try:
+                            with Image.open(io.BytesIO(image_bytes)) as source:
+                                output = io.BytesIO()
+                                if normalized_format == "jpg":
+                                    if source.mode in {"RGBA", "LA"} or "transparency" in source.info:
+                                        rgba = source.convert("RGBA")
+                                        converted = Image.new("RGB", rgba.size, "white")
+                                        converted.paste(rgba, mask=rgba.getchannel("A"))
+                                    else:
+                                        converted = source.convert("RGB")
+                                    converted.save(output, format="JPEG", quality=jpeg_quality, optimize=True)
+                                    converted.close()
+                                else:
+                                    converted = source.convert("RGB") if source.mode == "CMYK" else source.copy()
+                                    converted.save(output, format="PNG", optimize=True)
+                                    converted.close()
+
+                            extracted_count += 1
+                            archive.writestr(
+                                f"image_{extracted_count:03d}_page_{page_index + 1:03d}.{normalized_format}",
+                                output.getvalue()
+                            )
+                        except Exception as image_error:
+                            logger.warning(f"Failed to extract image xref {xref}: {image_error}")
+
+        if extracted_count == 0:
+            raise ValueError("No embedded raster images were found in this PDF")
+        return zip_buf.getvalue()
+    except ValueError:
+        raise
+    except Exception as e:
+        logger.error(f"Embedded image extraction failed: {e}")
+        raise ValueError(f"Failed to extract embedded images: {e}")
 
 
 def compress_pdf_bytes(file_data: bytes, level: str = 'medium') -> bytes:

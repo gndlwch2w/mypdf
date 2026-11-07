@@ -1,42 +1,89 @@
-## MyPDF
+# MyPDF
 
-A local tool like [iLovePDF](https://www.ilovepdf.com/), but works on your local environment for data privacy.
+A local-first desktop PDF toolkit. Files are processed on the current device and are never uploaded.
 
-### Features
-1. Convert, merge, split, and compress PDF files locally.
-2. Ensures data privacy by processing files on your local machine.
-3. Simple and intuitive web interface.
+## Features
 
+- Merge, split, compress, and organize PDFs
+- Convert between PDFs and images
+- Extract embedded images from PDFs
+- Rotate pages and add watermarks or page numbers
+- Protect and unlock PDFs
+- Extract text with OCR fallback for scanned documents
 
-### Usage
+## Stack
 
-Follow these steps to set up and run the MyPDF application locally:
+- Electron, React, and TypeScript
+- FastAPI and PyInstaller
+- PyMuPDF, pikepdf, PyPDF2, Pillow, and ReportLab
 
-1. **Clone the Repository**
-   Clone the project repository to your local machine:
-   ```bash
-   git clone https://github.com/gndlwch2w/mypdf.git
-   cd mypdf
-   ```
+## Requirements
 
-2. **Set Up a Virtual Environment**
-   Create and activate a Python virtual environment to isolate dependencies:
-   ```bash
-   python -m venv .venv
-   source .venv/bin/activate
-   ```
+- Node.js 20+
+- Python 3.9+
+- npm
+- Tesseract (optional, required only for OCR)
 
-3. **Install Dependencies**
-   Install the required Python packages listed in `requirements.txt`:
-   ```bash
-   pip install -r backend/requirements.txt
-   ```
+macOS / Linux:
 
-4. **Run the Application**
-   Start the backend server using Uvicorn:
-   ```bash
-   .venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000 --reload
-   ```
+```bash
+npm ci
+python3 -m venv .venv
+.venv/bin/python -m pip install -r backend/requirements.txt pyinstaller
+```
 
-5. **Access the Web Interface**
-   Open your browser and navigate to `http://127.0.0.1:8000` to use the application.
+Windows:
+
+```powershell
+npm ci
+py -3 -m venv .venv
+.venv\Scripts\python -m pip install -r backend\requirements.txt pyinstaller
+```
+
+## Development
+
+```bash
+npm run dev
+```
+
+Run only the Python API:
+
+```bash
+.venv/bin/python -m uvicorn app.main:app --app-dir backend --host 127.0.0.1 --port 8000
+```
+
+## Build Installers
+
+PyInstaller cannot cross-compile the Python backend. Build on the target operating system and CPU architecture.
+
+| Platform | Command | Output |
+| --- | --- | --- |
+| macOS | `npm run package:mac` | `release/*.dmg` |
+| Windows | `npm run package:win` | `release/*-setup.exe` |
+| Linux | `npm run package:linux` | `release/*.AppImage` |
+
+Each command builds the native Python backend, Electron frontend, and installer. Packages are unsigned by default. Public distribution requires Apple notarization, Windows code signing, or the appropriate Linux signing workflow.
+
+## Commands
+
+```bash
+npm run typecheck              # Check TypeScript
+npm run build:renderer         # Build the Electron frontend
+npm run build:backend:portable # Build the backend for the current platform
+npm run build:mac              # Build an unpacked macOS app
+```
+
+## Project Structure
+
+```text
+src/main/       Electron main process and backend lifecycle
+src/preload/    Typed IPC bridge
+src/renderer/   React interface
+src/shared/     Shared types
+backend/app/    PDF API and processing logic
+scripts/        Build scripts
+```
+
+## License
+
+MIT

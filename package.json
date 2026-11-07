@@ -1,0 +1,47 @@
+{
+  "name": "mypdf",
+  "version": "0.2.0",
+  "description": "Privacy-first PDF toolbox for the desktop",
+  "main": "./out/main/index.js",
+  "author": "chishengchen",
+  "license": "MIT",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "typecheck:node": "tsc --noEmit -p tsconfig.node.json --composite false",
+    "typecheck:web": "tsc --noEmit -p tsconfig.web.json --composite false",
+    "typecheck": "npm run typecheck:node && npm run typecheck:web",
+    "build:renderer": "electron-vite build",
+    "build": "npm run typecheck && npm run build:renderer",
+    "build:backend": "bash scripts/build-backend.sh",
+    "build:backend:portable": "node scripts/build-backend.mjs",
+    "rebuild:backend": "bash scripts/build-backend.sh --force",
+    "build:mac": "npm run build:backend && npm run build:renderer && electron-builder --mac dir",
+    "build:mac:clean": "npm run rebuild:backend && npm run build && electron-builder --mac dir",
+    "package:mac": "npm run rebuild:backend && npm run build && electron-builder --mac dmg",
+    "package:win": "npm run build:backend:portable && npm run build && electron-builder --win nsis",
+    "package:linux": "npm run build:backend:portable && npm run build && electron-builder --linux AppImage"
+  },
+  "dependencies": {
+    "@electron-toolkit/preload": "^3.0.2",
+    "@electron-toolkit/utils": "^4.0.0",
+    "pdfjs-dist": "4.10.38",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "react-icons": "^5.5.0"
+  },
+  "devDependencies": {
+    "@electron-toolkit/tsconfig": "^2.0.0",
+    "@types/node": "^22.15.30",
+    "@types/react": "^19.1.6",
+    "@types/react-dom": "^19.1.5",
+    "@vitejs/plugin-react": "^4.5.2",
+    "electron": "^37.2.0",
+    "electron-builder": "^26.0.12",
+    "electron-vite": "^3.1.0",
+    "typescript": "^5.8.3",
+    "vite": "^6.3.5"
+  },
+  "allowScripts": {
+    "electron@37.10.3": true
+  }
+}

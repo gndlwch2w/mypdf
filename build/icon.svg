@@ -1,0 +1,19 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1024" height="1024" viewBox="0 0 1024 1024">
+  <defs>
+    <linearGradient id="background" x1="132" y1="98" x2="884" y2="926" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#2E7655"/>
+      <stop offset="1" stop-color="#143D2A"/>
+    </linearGradient>
+    <filter id="shadow" x="180" y="126" width="674" height="814" filterUnits="userSpaceOnUse">
+      <feDropShadow dx="0" dy="30" stdDeviation="24" flood-color="#092619" flood-opacity=".32"/>
+    </filter>
+  </defs>
+  <rect x="32" y="32" width="960" height="960" rx="224" fill="url(#background)"/>
+  <path d="M198 214c78-91 190-142 314-142 233 0 422 189 422 422 0 143-71 270-180 346" fill="none" stroke="#B8D9C5" stroke-opacity=".12" stroke-width="34" stroke-linecap="round"/>
+  <g filter="url(#shadow)">
+    <path d="M268 193c0-30 24-54 54-54h264l170 170v504c0 30-24 54-54 54H322c-30 0-54-24-54-54V193Z" fill="#F8F7F0"/>
+    <path d="M586 139v132c0 21 17 38 38 38h132L586 139Z" fill="#DCE9E0"/>
+    <path d="m365 666 45-329h70l73 162 73-162h70l45 329h-80l-17-179-61 137h-60l-61-137-17 179h-80Z" fill="#246647"/>
+    <rect x="366" y="724" width="292" height="28" rx="14" fill="#E76F61"/>
+  </g>
+</svg>

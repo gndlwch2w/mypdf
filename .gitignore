@@ -1,9 +1,51 @@
-.venv/
-.vscode/
-__pycache__/
-*.pyc
-*.pyo
-*.pyd
+# macOS / editors
 .DS_Store
+.vscode/
+.idea/
+*.swp
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+*.pem
+*.key
+
+# Node / Electron
+node_modules/
+out/
+dist/
+release/
+.vite/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Python
+.venv/
+venv/
+__pycache__/
+*.py[cod]
+*.egg-info/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.coverage
+htmlcov/
+
+# PyInstaller output
+backend/build/
+backend/dist/
+backend/.pyinstaller-cache/
+*.spec
+
+# Generated app icon variants (source icon files remain tracked)
+build/icon.iconset/
+
+# Runtime and temporary files
 *.log
+*.tmp
+*.temp
 *.zip

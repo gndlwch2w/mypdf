@@ -46,9 +46,6 @@ class AppSettings(BaseModel):
     log_level: str = Field(default="INFO", description="Logging level")
     log_file: Optional[str] = Field(default="app.log", description="Log file path")
     
-    # Frontend configuration
-    frontend_dir: str = Field(default="../../frontend", description="Frontend directory path")
-    
     @validator('max_file_size_mb')
     def validate_max_file_size(cls, v):
         """Validate maximum file size is reasonable."""
@@ -94,8 +91,7 @@ def load_settings() -> AppSettings:
         default_image_dpi=int(os.getenv("MYPDF_DEFAULT_IMAGE_DPI", "300")),
         default_compression_level=os.getenv("MYPDF_DEFAULT_COMPRESSION_LEVEL", "medium"),
         log_level=os.getenv("MYPDF_LOG_LEVEL", "INFO"),
-        log_file=os.getenv("MYPDF_LOG_FILE", "app.log"),
-        frontend_dir=os.getenv("MYPDF_FRONTEND_DIR", "../../frontend")
+        log_file=os.getenv("MYPDF_LOG_FILE", "app.log")
     )
 
 

@@ -253,8 +253,8 @@ class ParameterValidator:
         Raises:
             ValidationError: If angle is invalid
         """
-        if angle not in [90, 180, 270]:
-            raise ValidationError("Rotation angle must be 90, 180, or 270 degrees")
+        if angle not in [0, 90, 180, 270]:
+            raise ValidationError("Rotation angle must be 0, 90, 180, or 270 degrees")
         return angle
     
     @staticmethod

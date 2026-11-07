@@ -1,0 +1,37 @@
+appId: io.github.gndlwch2w.mypdf
+productName: MyPDF
+directories:
+  buildResources: build
+  output: release
+files:
+  - out/**
+extraResources:
+  - from: backend/dist
+    to: backend
+    filter:
+      - mypdf-backend
+      - mypdf-backend.exe
+asar: true
+mac:
+  category: public.app-category.productivity
+  icon: build/icon-1024.png
+  identity: null
+  target:
+    - dmg
+  artifactName: ${productName}-${version}-${arch}.${ext}
+dmg:
+  sign: false
+win:
+  icon: build/icon-1024.png
+  target:
+    - nsis
+  artifactName: ${productName}-${version}-${arch}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+linux:
+  icon: build/icon-1024.png
+  category: Office
+  target:
+    - AppImage
+  artifactName: ${productName}-${version}-${arch}.${ext}

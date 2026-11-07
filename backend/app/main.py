@@ -1,7 +1,6 @@
 from fastapi import FastAPI, Request, HTTPException
-from fastapi.responses import JSONResponse, FileResponse, HTMLResponse
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
 from contextlib import asynccontextmanager
 import os
@@ -31,14 +30,6 @@ async def lifespan(app: FastAPI):
     """Application lifespan manager for startup and shutdown tasks."""
     # Initialization on startup
     logger.info(f"Starting {settings.app_name} v{settings.app_version}...")
-    
-    # Check frontend files
-    frontend_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), settings.frontend_dir))
-    index_path = os.path.join(frontend_dir, "index.html")
-    if not os.path.exists(index_path):
-        logger.error(f"Frontend index.html not found at {index_path}")
-    else:
-        logger.info(f"Frontend found at {frontend_dir}")
     
     # Check necessary PDF processing libraries
     missing_libs = []
@@ -86,12 +77,6 @@ app.add_middleware(
     allow_methods=["GET", "POST"],
     allow_headers=["*"],
 )
-
-# Static files configuration
-FRONTEND_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), settings.frontend_dir))
-
-# Mount static files
-app.mount("/static", StaticFiles(directory=FRONTEND_DIR), name="static")
 
 # Enhanced global exception handler for PDFProcessingError
 @app.exception_handler(PDFProcessingError)
@@ -182,19 +167,6 @@ from .api import pdf_routes  # noqa: E402
 # Register versioned API (recommended)
 app.include_router(pdf_routes.router, prefix="/api/v1/pdf", tags=["PDF Tools v1"])
 
-# Register backward compatibility API (for existing frontend)
-app.include_router(pdf_routes.router, prefix="/api/pdf", tags=["PDF Tools (Legacy)"])
-
-# Root route - serve frontend
-@app.get("/", response_class=HTMLResponse, tags=["Frontend"])
-async def serve_index():
-    """Serve application homepage."""
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    logger.error(f"Frontend index.html not found at {index_path}")
-    raise HTTPException(status_code=404, detail="Frontend not found")
-
 # Enhanced API status check with health information
 @app.get("/api/status", response_model=HealthResponse, tags=["System"])
 async def api_status():
@@ -203,7 +175,7 @@ async def api_status():
     # Perform basic health checks
     checks = {
         "database": "ok",  # No database in this app
-        "frontend": "ok" if os.path.exists(os.path.join(FRONTEND_DIR, "index.html")) else "error",
+        "api": "ok",
         "dependencies": "ok"
     }
     
@@ -223,47 +195,3 @@ async def api_status():
         checks=checks
     )
 
-# Handle frontend routing - serve index.html for all non-API, non-static routes
-@app.get("/{full_path:path}", response_class=HTMLResponse, tags=["Frontend"])
-async def serve_frontend(request: Request, full_path: str):
-    """Handle frontend routing and static files"""
-    # If it's an API request, let it naturally 404
-    if full_path.startswith("api/"):
-        raise HTTPException(status_code=404, detail="API endpoint not found")
-    
-    # If it's a static file request (css, js, images, etc.), serve directly
-    if "." in full_path:  # Files with extension
-        file_path = os.path.join(FRONTEND_DIR, full_path)
-        if os.path.exists(file_path):
-            # Determine media type based on file extension
-            media_types = {
-                '.css': "text/css",
-                '.js': "application/javascript", 
-                '.html': "text/html",
-                '.png': "image/png",
-                '.jpg': "image/jpeg",
-                '.jpeg': "image/jpeg",
-                '.gif': "image/gif",
-                '.svg': "image/svg+xml",
-                '.ico': "image/x-icon",
-                '.woff': "font/woff",
-                '.woff2': "font/woff2",
-                '.ttf': "font/ttf",
-                '.eot': "application/vnd.ms-fontobject"
-            }
-            
-            ext = '.' + full_path.split('.')[-1].lower()
-            media_type = media_types.get(ext, "application/octet-stream")
-            
-            return FileResponse(file_path, media_type=media_type)
-        
-        logger.warning(f"Static file not found: {full_path}")
-        raise HTTPException(status_code=404, detail="File not found")
-    
-    # For all other routes (tool routes without extension), serve index.html
-    index_path = os.path.join(FRONTEND_DIR, "index.html")
-    if os.path.exists(index_path):
-        return FileResponse(index_path)
-    
-    logger.error(f"Frontend index.html not found at {index_path}")
-    raise HTTPException(status_code=404, detail="Frontend not found")

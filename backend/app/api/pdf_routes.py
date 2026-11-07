@@ -5,6 +5,7 @@ import io
 import logging
 import asyncio
 from datetime import datetime
+from pathlib import Path
 
 from ..services import pdf_tools
 from ..config.settings import settings
@@ -105,7 +106,7 @@ async def merge_pdfs(files: List[UploadFile] = File(...)):
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=merged.pdf"}
         )
-    except (InvalidFileError, FileSizeError, ValidationError) as e:
+    except (InvalidFileError, FileSizeError, ValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise create_error_response(e, "PDF merge")
@@ -168,23 +169,34 @@ async def split_pdf(
 @router.post("/rotate")
 async def rotate_pdf(
     file: UploadFile = File(...), 
-    angle: int = Form(90)
+    angle: int = Form(90),
+    pages: str = Form("")
 ):
-    """Rotate PDF pages by specified angle (90, 180, or 270 degrees)."""
+    """Keep or rotate all PDF pages or a comma-separated selection of pages."""
     try:
         file_data = await FileValidator.validate_pdf_file(file)
         # Validate angle
         angle = ParameterValidator.validate_rotation_angle(angle)
-        logger.info(f"Rotating PDF by {angle} degrees")
+        selected_pages = None
+        if pages.strip():
+            try:
+                selected_pages = sorted({int(page.strip()) for page in pages.split(',') if page.strip()})
+            except ValueError as error:
+                raise ValidationError("Pages must be comma-separated page numbers") from error
+            if not selected_pages or any(page < 1 for page in selected_pages):
+                raise ValidationError("Page numbers must be positive integers")
+
+        target = "all pages" if selected_pages is None else f"pages {selected_pages}"
+        logger.info(f"Rotating {target} by {angle} degrees")
         
-        result = pdf_tools.rotate_pdf_bytes(file_data, angle)
+        result = pdf_tools.rotate_pdf_bytes(file_data, angle, selected_pages)
         
         return StreamingResponse(
             io.BytesIO(result), 
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=rotated.pdf"}
         )
-    except (InvalidFileError, FileSizeError, ValidationError) as e:
+    except (InvalidFileError, FileSizeError, ValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise create_error_response(e, "PDF rotation")
@@ -220,27 +232,69 @@ async def extract_text(file: UploadFile = File(...)):
 @router.post("/watermark")
 async def add_watermark(
     file: UploadFile = File(...),
-    watermark_text: str = Form("WATERMARK"),
-    opacity: float = Form(0.3)
+    watermark_image: Optional[UploadFile] = File(None),
+    watermark_type: str = Form("text"),
+    watermark_text: str = Form(""),
+    opacity: float = Form(0.3),
+    position: str = Form("center-center"),
+    mosaic: bool = Form(False),
+    rotation: int = Form(45),
+    font_family: str = Form("helvetica"),
+    font_size: int = Form(48),
+    bold: bool = Form(False),
+    italic: bool = Form(False),
+    underline: bool = Form(False),
+    color: str = Form("#666666"),
+    page_from: int = Form(1),
+    page_to: Optional[int] = Form(None),
+    layer: str = Form("over")
 ):
-    """Add text watermark to PDF."""
+    """Add a configurable text or image watermark to PDF pages."""
     try:
         file_data = await FileValidator.validate_pdf_file(file)
-        # Validate parameters
-        if not watermark_text.strip():
+        image_data = await watermark_image.read() if watermark_image else None
+        if watermark_type == "text" and not watermark_text.strip():
             raise ValidationError("Watermark text cannot be empty")
+        if watermark_type == "image" and not image_data:
+            raise ValidationError("Choose a watermark image")
         opacity = ParameterValidator.validate_opacity(opacity)
-        
-        logger.info(f"Adding watermark: '{watermark_text}' with opacity {opacity}")
-        
-        result = pdf_tools.add_text_watermark_bytes(file_data, watermark_text.strip(), opacity)
+        if position not in {
+            "top-left", "top-center", "top-right", "center-left", "center-center",
+            "center-right", "bottom-left", "bottom-center", "bottom-right"
+        }:
+            raise ValidationError("Invalid watermark position")
+        if rotation not in (0, 45, 90, 315):
+            raise ValidationError("Watermark rotation must be 0, 45, 90, or 315 degrees")
+        if layer not in ("over", "below"):
+            raise ValidationError("Watermark layer must be over or below")
+        if not 8 <= font_size <= 160:
+            raise ValidationError("Font size must be between 8 and 160")
+
+        result = pdf_tools.add_watermark_bytes(
+            file_data=file_data,
+            text=watermark_text,
+            image_data=image_data if watermark_type == "image" else None,
+            opacity=opacity,
+            position=position,
+            mosaic=mosaic,
+            rotation=rotation,
+            font_family=font_family,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            underline=underline,
+            color=color,
+            page_from=page_from,
+            page_to=page_to,
+            layer=layer,
+        )
         
         return StreamingResponse(
             io.BytesIO(result), 
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=watermarked.pdf"}
         )
-    except (InvalidFileError, FileSizeError, ValidationError) as e:
+    except (InvalidFileError, FileSizeError, ValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise create_error_response(e, "Watermark addition")
@@ -248,25 +302,46 @@ async def add_watermark(
 @router.post("/pagenum")
 async def add_page_numbers(
     file: UploadFile = File(...),
-    position: str = Form("bottom-right")
+    position: str = Form("bottom-right"),
+    margin: str = Form("recommended"),
+    first_number: int = Form(1),
+    page_from: int = Form(1),
+    page_to: Optional[int] = Form(None),
+    text_format: str = Form("{n} / {p}"),
+    font_family: str = Form("helvetica"),
+    font_size: int = Form(12),
+    bold: bool = Form(False),
+    italic: bool = Form(False),
+    underline: bool = Form(False),
+    color: str = Form("#333333"),
 ):
-    """Add page numbers to PDF."""
+    """Add styled page numbers to a selected page range."""
     try:
         file_data = await FileValidator.validate_pdf_file(file)
-        # Validate position
-        valid_positions = ["bottom-right", "bottom-left", "top-right", "top-left", "bottom-center", "top-center"]
-        position = ParameterValidator.validate_position(position, valid_positions)
-        
-        logger.info(f"Adding page numbers at position: {position}")
-        
-        result = pdf_tools.add_page_numbers_bytes(file_data, position)
+        logger.info(f"Adding page numbers from page {page_from} to {page_to or 'last'}")
+
+        result = pdf_tools.add_page_numbers_bytes(
+            file_data,
+            position=position,
+            margin=margin,
+            first_number=first_number,
+            page_from=page_from,
+            page_to=page_to,
+            text_format=text_format,
+            font_family=font_family,
+            font_size=font_size,
+            bold=bold,
+            italic=italic,
+            underline=underline,
+            color=color,
+        )
         
         return StreamingResponse(
             io.BytesIO(result), 
             media_type="application/pdf",
             headers={"Content-Disposition": "attachment; filename=numbered.pdf"}
         )
-    except (InvalidFileError, FileSizeError, ValidationError) as e:
+    except (InvalidFileError, FileSizeError, ValidationError, ValueError) as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise create_error_response(e, "Page numbering")
@@ -322,14 +397,16 @@ async def unlock_pdf(
 @router.post("/images-to-pdf")
 async def images_to_pdf_endpoint(
     files: List[UploadFile] = File(...),
-    page_size: str = Form("auto")
+    page_size: str = Form("A4"),
+    orientation: str = Form("portrait"),
+    margin: str = Form("none")
 ):
     """Convert multiple images to PDF."""
     try:
         files_data = await FileValidator.validate_multiple_files(files, "image")
         logger.info(f"Converting {len(files_data)} images to PDF (page size: {page_size})")
         
-        result = pdf_tools.images_to_pdf_bytes(files_data)
+        result = pdf_tools.images_to_pdf_bytes(files_data, page_size, orientation, margin)
         
         return StreamingResponse(
             io.BytesIO(result), 
@@ -344,54 +421,91 @@ async def images_to_pdf_endpoint(
 @router.post("/pdf-to-images")
 async def pdf_to_images(
     file: UploadFile = File(...),
+    mode: str = Form("pages"),
     format: str = Form("png"),
     quality: str = Form("medium")
 ):
-    """Convert PDF to images."""
+    """Render PDF pages or extract embedded raster images."""
     try:
         file_data = await FileValidator.validate_pdf_file(file)
-        # Validate format and quality
+        # Validate conversion mode, format and quality
+        valid_modes = ["pages", "extract"]
         valid_formats = ["png", "jpg", "jpeg"]
         valid_qualities = ["low", "medium", "high"]
-        
+
+        if mode not in valid_modes:
+            raise ValidationError(f"Mode must be one of: {', '.join(valid_modes)}")
         if format not in valid_formats:
             raise ValidationError(f"Format must be one of: {', '.join(valid_formats)}")
         if quality not in valid_qualities:
             raise ValidationError(f"Quality must be one of: {', '.join(valid_qualities)}")
-            
-        logger.info(f"Converting PDF to images (format: {format}, quality: {quality})")
-        
-        # Run conversion in background thread (may take time)
-        zip_bytes = await asyncio.get_event_loop().run_in_executor(
-            None, pdf_tools.pdf_to_images_zip_bytes, file_data
+
+        logger.info(f"Converting PDF to images (mode: {mode}, format: {format}, quality: {quality})")
+
+        operation = (
+            pdf_tools.extract_pdf_images_zip_bytes
+            if mode == "extract"
+            else pdf_tools.pdf_to_images_zip_bytes
         )
-        
+        zip_bytes = await asyncio.get_event_loop().run_in_executor(
+            None, operation, file_data, format, quality
+        )
+
+        filename = "extracted_images.zip" if mode == "extract" else "pdf_images.zip"
         return StreamingResponse(
             io.BytesIO(zip_bytes), 
             media_type="application/zip",
-            headers={"Content-Disposition": "attachment; filename=pdf_images.zip"}
+            headers={"Content-Disposition": f"attachment; filename={filename}"}
         )
     except (InvalidFileError, FileSizeError, ValidationError) as e:
+        raise HTTPException(status_code=400, detail=str(e))
+    except ValueError as e:
         raise HTTPException(status_code=400, detail=str(e))
     except Exception as e:
         raise create_error_response(e, "PDF to images conversion")
 
 @router.post("/compress")
 async def compress_pdf(
-    file: UploadFile = File(...),
+    file: Optional[UploadFile] = File(None),
+    files: Optional[List[UploadFile]] = File(None),
     level: str = Form("medium")
 ):
-    """Compress PDF file with compression statistics."""
+    """Compress one PDF directly or multiple PDFs as a ZIP batch."""
     try:
-        file_data = await FileValidator.validate_pdf_file(file)
+        uploads = list(files or [])
+        if file is not None:
+            uploads.insert(0, file)
+
+        files_data = await FileValidator.validate_multiple_files(uploads, "PDF")
         # Validate compression level
         level = ParameterValidator.validate_compression_level(level)
-        logger.info(f"Compressing PDF with level: {level}")
-        
-        result = pdf_tools.compress_pdf_bytes(file_data, level)
+        logger.info(f"Compressing {len(files_data)} PDF(s) with level: {level}")
+
+        compressed_files = []
+        for upload, file_data in zip(uploads, files_data):
+            compressed_files.append((upload, pdf_tools.compress_pdf_bytes(file_data, level)))
         
         # Calculate compression statistics
-        original_size = len(file_data)
+        original_size = sum(len(file_data) for file_data in files_data)
+
+        if len(compressed_files) == 1:
+            result = compressed_files[0][1]
+            media_type = "application/pdf"
+            filename = "compressed.pdf"
+        else:
+            named_results = {}
+            for index, (upload, result) in enumerate(compressed_files, start=1):
+                source_name = Path(upload.filename or f"document-{index}.pdf").name
+                stem = Path(source_name).stem or f"document-{index}"
+                output_name = f"{stem}-compressed.pdf"
+                if output_name in named_results:
+                    output_name = f"{stem}-compressed-{index}.pdf"
+                named_results[output_name] = result
+
+            result = pdf_tools.zip_named_files(named_results)
+            media_type = "application/zip"
+            filename = "compressed-pdfs.zip"
+
         compressed_size = len(result)
         compression_ratio = (1 - compressed_size / original_size) * 100 if original_size > 0 else 0
         
@@ -399,9 +513,9 @@ async def compress_pdf(
         
         return StreamingResponse(
             io.BytesIO(result), 
-            media_type="application/pdf",
+            media_type=media_type,
             headers={
-                "Content-Disposition": "attachment; filename=compressed.pdf",
+                "Content-Disposition": f"attachment; filename={filename}",
                 "X-Original-Size": str(original_size),
                 "X-Compressed-Size": str(compressed_size),
                 "X-Compression-Ratio": f"{compression_ratio:.1f}%"
