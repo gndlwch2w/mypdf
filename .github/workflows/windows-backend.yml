@@ -52,27 +52,38 @@ jobs:
 
       - name: Start frozen backend and check health
         shell: pwsh
+        env:
+          MYPDF_DEBUG_STARTUP: '1'
+          MYPDF_LOG_FILE: ''
         run: |
           $env:MYPDF_PORT = '58169'
           $backend = Start-Process -FilePath 'backend\dist\mypdf-backend.exe' -PassThru -NoNewWindow
           $healthy = $false
+          $lastFailure = 'No response yet'
           try {
-            for ($attempt = 1; $attempt -le 45; $attempt++) {
+            for ($attempt = 1; $attempt -le 40; $attempt++) {
               if ($backend.HasExited) {
                 throw "Frozen backend exited with code $($backend.ExitCode)"
               }
               try {
                 $status = Invoke-RestMethod -Uri 'http://127.0.0.1:58169/api/status' -TimeoutSec 2
+                Write-Host "Health response: $($status | ConvertTo-Json -Compress -Depth 5)"
                 if ($status.status -eq 'healthy') {
                   $healthy = $true
-                  break
+                } else {
+                  $lastFailure = "Backend reported status: $($status.status)"
                 }
+                break
               } catch {
-                Start-Sleep -Seconds 2
+                $lastFailure = $_.Exception.Message
+                if ($attempt % 5 -eq 0) {
+                  Write-Host "Health attempt $attempt failed: $lastFailure"
+                }
               }
+              Start-Sleep -Seconds 2
             }
             if (-not $healthy) {
-              throw 'Frozen backend did not become healthy within 90 seconds'
+              throw "Frozen backend was not healthy: $lastFailure"
             }
           } finally {
             if (-not $backend.HasExited) {
