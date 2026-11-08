@@ -13,6 +13,7 @@ A local-first desktop PDF toolkit. Files are processed on the current device and
 - Rotate pages and add watermarks or page numbers
 - Protect and unlock PDFs
 - Extract text with OCR fallback for scanned documents
+- Continue PDF results through compatible tools as a multi-step workflow
 
 ## Stack
 

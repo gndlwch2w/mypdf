@@ -4,6 +4,7 @@ import {
   FiChevronDown,
   FiChevronUp,
   FiFolder,
+  FiGitBranch,
   FiMove,
   FiPlus,
   FiShield,
@@ -55,6 +56,26 @@ type PreviewTarget = {
   page?: number
   pageRotations?: Record<number, number>
 }
+type ProcessedResult = {
+  path: string
+  file?: DesktopFile
+  detail?: string
+}
+
+const pdfWorkflowTools: ToolId[] = [
+  'merge',
+  'split',
+  'compress',
+  'pdf-to-images',
+  'edit',
+  'rotate',
+  'watermark',
+  'unlock',
+  'protect',
+  'organize',
+  'pagenum',
+  'extract-text'
+]
 let fileEntrySequence = 0
 
 function makeFileEntry(file: DesktopFile): FileEntry {
@@ -76,12 +97,15 @@ export default function App(): React.JSX.Element {
   const [processing, setProcessing] = useState(false)
   const [optionsCollapsed, setOptionsCollapsed] = useState(true)
   const [error, setError] = useState('')
-  const [result, setResult] = useState<{ path: string; detail?: string } | null>(null)
+  const [result, setResult] = useState<ProcessedResult | null>(null)
+  const [workflowSteps, setWorkflowSteps] = useState<ToolId[]>([])
+  const [workflowMenuOpen, setWorkflowMenuOpen] = useState(false)
   const [version, setVersion] = useState('')
   const organizeFileCount = useRef(0)
   const skipNextOrganizeReload = useRef(false)
 
   const activeTool = useMemo(() => (selectedTool ? getTool(selectedTool) : null), [selectedTool])
+  const availableWorkflowTools: ToolId[] = selectedTool === 'protect' ? ['unlock'] : pdfWorkflowTools
   const ActiveToolIcon = activeTool?.icon
   const hasOptions = selectedTool !== null && [
     'split',
@@ -157,6 +181,8 @@ export default function App(): React.JSX.Element {
     setResult(null)
     setPreviewTarget(null)
     setRotatePages([])
+    setWorkflowSteps([])
+    setWorkflowMenuOpen(false)
   }
 
   function goHome(): void {
@@ -166,6 +192,23 @@ export default function App(): React.JSX.Element {
     setResult(null)
     setPreviewTarget(null)
     setRotatePages([])
+    setWorkflowSteps([])
+    setWorkflowMenuOpen(false)
+  }
+
+  function continueWorkflow(id: ToolId): void {
+    if (!selectedTool || !result?.file || result.file.type !== 'application/pdf') return
+    const completedTool = selectedTool
+    setSelectedTool(id)
+    setFiles([makeFileEntry(result.file)])
+    setOptions(defaultOptions(id))
+    setError('')
+    setResult(null)
+    setPreviewTarget(null)
+    setRotatePages([])
+    setOptionsCollapsed(true)
+    setWorkflowSteps((current) => [...current, completedTool])
+    setWorkflowMenuOpen(false)
   }
 
   function addFiles(next: DesktopFile[]): void {
@@ -311,7 +354,8 @@ export default function App(): React.JSX.Element {
             ? `${formatBytes(response.originalSize)} → ${formatBytes(response.outputSize)} · ${change}% smaller`
             : formatBytes(response.outputSize)
         }
-        setResult({ path: response.outputPath, detail })
+        setResult({ path: response.outputPath, file: response.outputFile, detail })
+        setWorkflowMenuOpen(false)
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -334,7 +378,12 @@ export default function App(): React.JSX.Element {
         editorAssets
       })
       if (!response.cancelled && response.outputPath) {
-        setResult({ path: response.outputPath, detail: response.outputSize ? formatBytes(response.outputSize) : undefined })
+        setResult({
+          path: response.outputPath,
+          file: response.outputFile,
+          detail: response.outputSize ? formatBytes(response.outputSize) : undefined
+        })
+        setWorkflowMenuOpen(false)
       }
     } catch (reason) {
       setError(reason instanceof Error ? reason.message : String(reason))
@@ -407,7 +456,21 @@ export default function App(): React.JSX.Element {
           <div className="workspace-view">
             <header className="workspace-header">
               <div className="workspace-icon" style={{ background: activeTool!.accent }}>{ActiveToolIcon && <ActiveToolIcon />}</div>
-              <div><span>PDF TOOL</span><h1>{activeTool!.title}</h1><p>{activeTool!.description}</p></div>
+              <div>
+                <span>{workflowSteps.length > 0 ? 'PDF WORKFLOW' : 'PDF TOOL'}</span>
+                <h1>{activeTool!.title}</h1>
+                <p>{activeTool!.description}</p>
+                {workflowSteps.length > 0 && (
+                  <div className="workflow-trail" aria-label="Workflow steps">
+                    <FiGitBranch />
+                    {[...workflowSteps, selectedTool].map((toolId, index) => (
+                      <span key={`${toolId}-${index}`} className={index === workflowSteps.length ? 'current' : ''}>
+                        {getTool(toolId).shortTitle}
+                      </span>
+                    ))}
+                  </div>
+                )}
+              </div>
             </header>
 
             {selectedTool === 'edit' && files.length > 0 ? (
@@ -431,7 +494,22 @@ export default function App(): React.JSX.Element {
                         <FiCheck />
                         <div><strong>Done — your edited PDF is ready.</strong>{result.detail && <span>{result.detail}</span>}</div>
                         <button type="button" onClick={() => void window.mypdf.showItemInFolder(result.path)}><FiFolder /> Show in Finder</button>
+                        {result.file?.type === 'application/pdf' && (
+                          <button type="button" onClick={() => setWorkflowMenuOpen((current) => !current)}><FiGitBranch /> Continue workflow</button>
+                        )}
                         <button className="success-dismiss" type="button" aria-label="Dismiss result" onClick={() => setResult(null)}><FiX /></button>
+                      </div>
+                    )}
+                    {result?.file?.type === 'application/pdf' && workflowMenuOpen && (
+                      <div className="workflow-picker">
+                        <div><FiGitBranch /><span><strong>Continue with another tool</strong><small>The saved PDF becomes the next step's input.</small></span></div>
+                        <div>
+                          {availableWorkflowTools.map((toolId) => {
+                            const tool = getTool(toolId)
+                            const Icon = tool.icon
+                            return <button type="button" key={toolId} onClick={() => continueWorkflow(toolId)}><Icon />{tool.shortTitle}</button>
+                          })}
+                        </div>
                       </div>
                     )}
                   </div>
@@ -648,12 +726,29 @@ export default function App(): React.JSX.Element {
                     </div>
                   )}
                   {result && (
-                    <div className="message success-message">
-                      <FiCheck />
-                      <div><strong>Done — your file is ready.</strong>{result.detail && <span>{result.detail}</span>}</div>
-                      <button type="button" onClick={() => void window.mypdf.showItemInFolder(result.path)}><FiFolder /> Show in Finder</button>
-                      <button className="success-dismiss" type="button" aria-label="Dismiss result" title="Close" onClick={() => setResult(null)}><FiX /></button>
-                    </div>
+                    <>
+                      <div className="message success-message">
+                        <FiCheck />
+                        <div><strong>Done — your file is ready.</strong>{result.detail && <span>{result.detail}</span>}</div>
+                        <button type="button" onClick={() => void window.mypdf.showItemInFolder(result.path)}><FiFolder /> Show in Finder</button>
+                        {result.file?.type === 'application/pdf' && (
+                          <button type="button" onClick={() => setWorkflowMenuOpen((current) => !current)}><FiGitBranch /> Continue workflow</button>
+                        )}
+                        <button className="success-dismiss" type="button" aria-label="Dismiss result" title="Close" onClick={() => setResult(null)}><FiX /></button>
+                      </div>
+                      {result.file?.type === 'application/pdf' && workflowMenuOpen && (
+                        <div className="workflow-picker">
+                          <div><FiGitBranch /><span><strong>Continue with another tool</strong><small>The saved PDF becomes the next step's input.</small></span></div>
+                          <div>
+                            {availableWorkflowTools.map((toolId) => {
+                              const tool = getTool(toolId)
+                              const Icon = tool.icon
+                              return <button type="button" key={toolId} onClick={() => continueWorkflow(toolId)}><Icon />{tool.shortTitle}</button>
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </>
                   )}
                 </div>
               )}

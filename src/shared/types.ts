@@ -107,6 +107,7 @@ export interface ProcessRequest {
 export interface ProcessResult {
   cancelled: boolean
   outputPath?: string
+  outputFile?: DesktopFile
   originalSize?: number
   outputSize?: number
 }

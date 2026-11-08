@@ -144,6 +144,7 @@ function registerIpc(): void {
     return {
       cancelled: false,
       outputPath: result.filePath,
+      outputFile: await describePath(result.filePath),
       originalSize: output.originalSize,
       outputSize: output.data.byteLength
     }

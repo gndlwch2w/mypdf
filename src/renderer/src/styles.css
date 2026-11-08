@@ -511,6 +511,42 @@ select:focus-visible {
   font-size: 10px;
 }
 
+.workflow-trail {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+  color: #7f8982;
+  font-size: 8px;
+}
+
+.workflow-trail > svg {
+  width: 12px;
+  height: 12px;
+  color: #397457;
+}
+
+.workflow-trail span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 7px;
+  border: 1px solid #dfe5df;
+  border-radius: 999px;
+  color: #637069;
+  background: #fff;
+  font-size: 8px;
+  font-weight: 600;
+  letter-spacing: 0;
+}
+
+.workflow-trail span.current {
+  border-color: #9fc5ae;
+  color: #225e42;
+  background: #edf7f0;
+}
+
 .workspace-body {
   width: min(900px, calc(100% - 68px));
   margin: 0 auto;
@@ -3813,6 +3849,78 @@ button:disabled {
   margin-left: auto;
 }
 
+.workflow-picker {
+  width: min(620px, 100%);
+  margin: 8px 0 0 auto;
+  padding: 13px;
+  pointer-events: auto;
+  border: 1px solid #d9e3dc;
+  border-radius: 12px;
+  background: rgba(255, 255, 253, 0.98);
+  box-shadow: 0 12px 34px rgba(31, 47, 38, 0.16);
+}
+
+.workflow-picker > div:first-child {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin-bottom: 10px;
+  color: #35684e;
+}
+
+.workflow-picker > div:first-child > svg {
+  width: 17px;
+  height: 17px;
+}
+
+.workflow-picker > div:first-child span {
+  display: flex;
+  flex-direction: column;
+}
+
+.workflow-picker > div:first-child strong {
+  font-size: 11px;
+}
+
+.workflow-picker > div:first-child small {
+  margin-top: 2px;
+  color: #89928c;
+  font-size: 9px;
+}
+
+.workflow-picker > div:last-child {
+  display: flex;
+  max-height: 104px;
+  flex-wrap: wrap;
+  gap: 6px;
+  overflow: auto;
+}
+
+.workflow-picker button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 6px 9px;
+  border: 1px solid #dfe4df;
+  border-radius: 8px;
+  color: #53635a;
+  background: #f8faf7;
+  font-size: 9px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.workflow-picker button:hover {
+  border-color: #9fc2ad;
+  color: #225e42;
+  background: #edf7f0;
+}
+
+.workflow-picker button svg {
+  width: 12px;
+  height: 12px;
+}
+
 .error-message > span { flex: 1; }
 
 .error-message .error-dismiss {
@@ -4400,6 +4508,10 @@ button:disabled {
 .pdf-editor-status .message {
   margin: 0;
   box-shadow: 0 10px 30px rgba(31, 47, 38, 0.15);
+}
+
+.pdf-editor-status .workflow-picker {
+  width: 100%;
 }
 
 @media (max-width: 1180px) {
