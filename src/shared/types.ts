@@ -28,8 +28,9 @@ export interface OrganizePage {
   included: boolean
 }
 
-export type PdfEditorTool = 'select' | 'hand' | 'text' | 'shape' | 'draw'
+export type PdfEditorTool = 'select' | 'hand' | 'text' | 'shape' | 'draw' | PdfAnnotationKind
 export type PdfShapeKind = 'rectangle' | 'ellipse' | 'line' | 'arrow'
+export type PdfAnnotationKind = 'highlight' | 'underline' | 'strikeout' | 'note'
 
 export interface PdfEditElementBase {
   id: string
@@ -74,7 +75,14 @@ export interface PdfDrawingElement extends PdfEditElementBase {
   strokeWidth: number
 }
 
-export type PdfEditElement = PdfTextElement | PdfImageElement | PdfShapeElement | PdfDrawingElement
+export interface PdfAnnotationElement extends PdfEditElementBase {
+  type: 'annotation'
+  annotation: PdfAnnotationKind
+  color: string
+  text: string
+}
+
+export type PdfEditElement = PdfTextElement | PdfImageElement | PdfShapeElement | PdfDrawingElement | PdfAnnotationElement
 
 export interface PdfEditDocument {
   version: 1

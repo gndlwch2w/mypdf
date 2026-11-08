@@ -4,7 +4,6 @@ import math
 import os
 import shutil
 import subprocess
-import sys
 import tempfile
 import zipfile
 import logging
@@ -45,35 +44,6 @@ def _find_soffice() -> str:
     raise ValueError("LibreOffice is required for Office document conversion. Install it and restart MyPDF.")
 
 
-def _powerpoint_to_pdf_macos(source_path: Path, pdf_path: Path) -> None:
-    """Use an installed Microsoft PowerPoint app for native macOS PDF export."""
-    powerpoint_app = Path("/Applications/Microsoft PowerPoint.app")
-    if not powerpoint_app.is_dir():
-        raise ValueError("Microsoft PowerPoint or LibreOffice is required for PowerPoint conversion")
-    script = [
-        "on run argv",
-        "set inputFile to POSIX file (item 1 of argv)",
-        "set outputFile to POSIX file (item 2 of argv)",
-        'tell application "Microsoft PowerPoint"',
-        "open inputFile",
-        "save active presentation in outputFile as save as PDF",
-        "close active presentation saving no",
-        "end tell",
-        "end run",
-    ]
-    command = ["/usr/bin/osascript"]
-    for line in script:
-        command.extend(["-e", line])
-    command.extend([str(source_path), str(pdf_path)])
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=180, check=False)
-    except subprocess.TimeoutExpired as error:
-        raise ValueError("Microsoft PowerPoint export timed out") from error
-    if result.returncode != 0 or not pdf_path.exists():
-        detail = (result.stderr or result.stdout or "Unknown Microsoft PowerPoint error").strip()
-        raise ValueError(f"Microsoft PowerPoint export failed: {detail}")
-
-
 def powerpoint_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "electronic") -> bytes:
     """Render a PowerPoint presentation to PDF using local LibreOffice."""
     if quality not in {"electronic", "print"}:
@@ -86,10 +56,6 @@ def powerpoint_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "ele
         source_path = Path(temp_dir) / f"presentation{suffix}"
         source_path.write_bytes(file_data)
         pdf_path = source_path.with_suffix(".pdf")
-        if sys.platform == "darwin" and Path("/Applications/Microsoft PowerPoint.app").is_dir():
-            _powerpoint_to_pdf_macos(source_path, pdf_path)
-            exported = pdf_path.read_bytes()
-            return compress_pdf_bytes(exported, "medium") if quality == "electronic" else exported
 
         if quality == "electronic":
             pdf_filter = 'pdf:impress_pdf_Export:{"Quality":{"type":"long","value":"85"},"ReduceImageResolution":{"type":"boolean","value":"true"},"MaxImageResolution":{"type":"long","value":"150"}}'
@@ -113,38 +79,8 @@ def powerpoint_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "ele
         return pdf_path.read_bytes()
 
 
-def _word_to_pdf_macos(source_path: Path, pdf_path: Path) -> None:
-    """Use an installed Microsoft Word app for native macOS PDF export."""
-    word_app = Path("/Applications/Microsoft Word.app")
-    if not word_app.is_dir():
-        raise ValueError("Microsoft Word or LibreOffice is required for Word conversion")
-    script = [
-        "on run argv",
-        "set inputFile to POSIX file (item 1 of argv)",
-        "set outputFile to POSIX file (item 2 of argv)",
-        'tell application "Microsoft Word"',
-        "open inputFile",
-        "set wordDocument to active document",
-        "save as wordDocument file name outputFile file format format PDF",
-        "close wordDocument saving no",
-        "end tell",
-        "end run",
-    ]
-    command = ["/usr/bin/osascript"]
-    for line in script:
-        command.extend(["-e", line])
-    command.extend([str(source_path), str(pdf_path)])
-    try:
-        result = subprocess.run(command, capture_output=True, text=True, timeout=180, check=False)
-    except subprocess.TimeoutExpired as error:
-        raise ValueError("Microsoft Word export timed out") from error
-    if result.returncode != 0 or not pdf_path.exists():
-        detail = (result.stderr or result.stdout or "Unknown Microsoft Word error").strip()
-        raise ValueError(f"Microsoft Word export failed: {detail}")
-
-
 def word_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "electronic") -> bytes:
-    """Render a Word document to PDF using a local Microsoft Word or LibreOffice installation."""
+    """Render a Word document to PDF using local LibreOffice."""
     if quality not in {"electronic", "print"}:
         raise ValueError("Word PDF quality must be electronic or print")
     suffix = Path(filename).suffix.lower()
@@ -155,10 +91,6 @@ def word_to_pdf_bytes(file_data: bytes, filename: str, quality: str = "electroni
         source_path = Path(temp_dir) / f"document{suffix}"
         source_path.write_bytes(file_data)
         pdf_path = source_path.with_suffix(".pdf")
-        if sys.platform == "darwin" and Path("/Applications/Microsoft Word.app").is_dir():
-            _word_to_pdf_macos(source_path, pdf_path)
-            exported = pdf_path.read_bytes()
-            return compress_pdf_bytes(exported, "medium") if quality == "electronic" else exported
 
         if quality == "electronic":
             pdf_filter = 'pdf:writer_pdf_Export:{"Quality":{"type":"long","value":"85"},"ReduceImageResolution":{"type":"boolean","value":"true"},"MaxImageResolution":{"type":"long","value":"150"}}'
@@ -1084,7 +1016,7 @@ def zip_named_files(name_bytes: Dict[str, bytes]) -> bytes:
 
 
 def edit_pdf_bytes(file_data: bytes, edit_document: dict, assets: Dict[str, bytes]) -> bytes:
-    """Apply normalized overlay elements to a PDF."""
+    """Apply normalized overlay and annotation elements to a PDF."""
     validate_pdf_data(file_data)
     elements = edit_document.get("elements") if isinstance(edit_document, dict) else None
     if not isinstance(elements, list):
@@ -1192,6 +1124,26 @@ def edit_pdf_bytes(file_data: bytes, edit_document: dict, assets: Dict[str, byte
                             stroke_opacity=opacity,
                             overlay=True,
                         )
+                elif element_type == "annotation":
+                    annotation_kind = element.get("annotation", "highlight")
+                    annotation_color = _editor_color(element.get("color", "#f4c542"), "#f4c542")
+                    if annotation_kind == "highlight":
+                        annotation = page.add_highlight_annot(rect)
+                    elif annotation_kind == "underline":
+                        annotation = page.add_underline_annot(rect)
+                    elif annotation_kind == "strikeout":
+                        annotation = page.add_strikeout_annot(rect)
+                    elif annotation_kind == "note":
+                        annotation = page.add_text_annot(
+                            fitz.Point(rect.x0, rect.y0),
+                            str(element.get("text", "Note")),
+                            icon="Note",
+                        )
+                    else:
+                        continue
+                    annotation.set_colors(stroke=annotation_color)
+                    annotation.set_opacity(opacity)
+                    annotation.update()
 
             return document.tobytes(garbage=4, deflate=True)
     except Exception as error:

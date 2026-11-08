@@ -11,6 +11,7 @@ import {
   FiMove,
   FiCornerUpRight,
   FiSave,
+  FiSidebar,
   FiSquare,
   FiTrash2,
   FiType,
@@ -20,9 +21,12 @@ import {
   FiZoomIn,
   FiZoomOut
 } from 'react-icons/fi'
+import { LuHighlighter, LuStickyNote, LuStrikethrough, LuUnderline } from 'react-icons/lu'
 import type { PDFDocumentProxy, RenderTask } from 'pdfjs-dist'
 import type {
   DesktopFile,
+  PdfAnnotationElement,
+  PdfAnnotationKind,
   PdfDrawingElement,
   PdfEditAsset,
   PdfEditDocument,
@@ -102,6 +106,9 @@ export default function PdfEditor({ file, saving, onRemove, onSave }: PdfEditorP
   const [stroke, setStroke] = useState('#347759')
   const [fill, setFill] = useState('#edf6f0')
   const [strokeWidth, setStrokeWidth] = useState(2)
+  const [annotationColor, setAnnotationColor] = useState('#f4c542')
+  const [pagesOpen, setPagesOpen] = useState(true)
+  const [pagesWidth, setPagesWidth] = useState(124)
   const canvasRef = useRef<HTMLCanvasElement>(null)
   const overlayRef = useRef<SVGSVGElement>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -246,7 +253,7 @@ export default function PdfEditor({ file, saving, onRemove, onSave }: PdfEditorP
         setEditingTextId(null)
         setActiveTool('select')
       }
-      const toolByKey: Partial<Record<string, PdfEditorTool>> = { v: 'select', h: 'hand', t: 'text', s: 'shape', p: 'draw' }
+      const toolByKey: Partial<Record<string, PdfEditorTool>> = { v: 'select', h: 'hand', t: 'text', s: 'shape', p: 'draw', m: 'highlight' }
       const tool = toolByKey[event.key.toLowerCase()]
       if (tool) setActiveTool(tool)
     }
@@ -392,6 +399,44 @@ export default function PdfEditor({ file, saving, onRemove, onSave }: PdfEditorP
       return
     }
 
+    if (activeTool === 'highlight' || activeTool === 'underline' || activeTool === 'strikeout' || activeTool === 'note') {
+      const annotation = activeTool as PdfAnnotationKind
+      const element: PdfAnnotationElement = {
+        id: nextId('annotation'), type: 'annotation', annotation, page: currentPage,
+        x: point.x, y: point.y,
+        width: Math.min(annotation === 'note' ? 0.045 : 0.18, 1 - point.x),
+        height: Math.min(annotation === 'note' ? 0.045 : 0.04, 1 - point.y),
+        opacity: annotation === 'highlight' ? 0.38 : 1,
+        zIndex, color: annotationColor, text: annotation === 'note' ? 'Note' : ''
+      }
+      if (annotation === 'note') {
+        commit({ ...documentRef.current, elements: [...documentRef.current.elements, element] })
+        setSelectedId(element.id)
+        setActiveTool('select')
+        return
+      }
+
+      const before = documentRef.current
+      setPresent((current) => ({ ...current, elements: [...current.elements, element] }))
+      setSelectedId(element.id)
+      const move = (moveEvent: PointerEvent): void => {
+        const next = pointFromEvent(moveEvent)
+        const x = Math.min(point.x, next.x)
+        const y = Math.min(point.y, next.y)
+        const width = Math.max(0.01, Math.abs(next.x - point.x))
+        const height = Math.max(0.01, Math.abs(next.y - point.y))
+        setPresent((current) => replaceElement(current, element.id, (item) => ({ ...item, x, y, width, height })))
+      }
+      const up = (): void => {
+        window.removeEventListener('pointermove', move)
+        window.removeEventListener('pointerup', up)
+        finishInteraction(before)
+      }
+      window.addEventListener('pointermove', move)
+      window.addEventListener('pointerup', up, { once: true })
+      return
+    }
+
     if (activeTool === 'draw') {
       const before = documentRef.current
       const element: PdfDrawingElement = {
@@ -415,6 +460,21 @@ export default function PdfEditor({ file, saving, onRemove, onSave }: PdfEditorP
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up, { once: true })
     }
+  }
+
+  function startPagesResize(event: React.PointerEvent<HTMLDivElement>): void {
+    event.preventDefault()
+    const startX = event.clientX
+    const startWidth = pagesWidth
+    const move = (moveEvent: PointerEvent): void => {
+      setPagesWidth(clamp(startWidth + moveEvent.clientX - startX, 112, 360))
+    }
+    const up = (): void => {
+      window.removeEventListener('pointermove', move)
+      window.removeEventListener('pointerup', up)
+    }
+    window.addEventListener('pointermove', move)
+    window.addEventListener('pointerup', up, { once: true })
   }
 
   async function addImage(): Promise<void> {
@@ -471,6 +531,21 @@ export default function PdfEditor({ file, saving, onRemove, onSave }: PdfEditorP
       }, []).join(' ')
       return <polyline key={element.id} {...common} points={points} fill="none" stroke={element.stroke} strokeWidth={element.strokeWidth * zoom} strokeLinecap="round" strokeLinejoin="round" />
     }
+    if (element.type === 'annotation') {
+      if (element.annotation === 'highlight') {
+        return <rect key={element.id} {...common} x={bounds.x} y={bounds.y} width={bounds.width} height={bounds.height} fill={element.color} rx={2} />
+      }
+      if (element.annotation === 'underline' || element.annotation === 'strikeout') {
+        const y = element.annotation === 'underline' ? bounds.y + bounds.height : bounds.y + bounds.height / 2
+        return <line key={element.id} {...common} x1={bounds.x} y1={y} x2={bounds.x + bounds.width} y2={y} stroke={element.color} strokeWidth={Math.max(2, 2 * zoom)} strokeLinecap="round" />
+      }
+      return (
+        <g key={element.id} {...common} transform={`translate(${bounds.x} ${bounds.y})`}>
+          <rect width={Math.max(bounds.width, 24)} height={Math.max(bounds.height, 24)} rx="4" fill={element.color} stroke="#a47500" strokeWidth="1" />
+          <path d="M6 8h12M6 12h9M6 16h7" fill="none" stroke="#6f5200" strokeWidth="1.5" strokeLinecap="round" />
+        </g>
+      )
+    }
     const shape = element as PdfShapeElement
     if (shape.shape === 'ellipse') {
       return <ellipse key={element.id} {...common} cx={bounds.x + bounds.width / 2} cy={bounds.y + bounds.height / 2} rx={bounds.width / 2} ry={bounds.height / 2} fill={colorWithOpacity(shape.fill, shape.opacity)} stroke={shape.stroke} strokeWidth={shape.strokeWidth * zoom} />
@@ -502,6 +577,16 @@ export default function PdfEditor({ file, saving, onRemove, onSave }: PdfEditorP
             </button>
           ))}
           <button type="button" onClick={() => void addImage()} title="Add image"><FiImage /><span>Image</span></button>
+          {([
+            ['highlight', LuHighlighter, 'Highlight'],
+            ['underline', LuUnderline, 'Underline'],
+            ['strikeout', LuStrikethrough, 'Strikeout'],
+            ['note', LuStickyNote, 'Note']
+          ] as const).map(([tool, Icon, label]) => (
+            <button className={activeTool === tool ? 'selected' : ''} type="button" key={tool} onClick={() => setActiveTool(tool)} title={label}>
+              <Icon /><span>{label}</span>
+            </button>
+          ))}
         </div>
         <div className="pdf-editor-toolbar-spacer" />
         <div className="pdf-editor-tool-group compact">
@@ -546,22 +631,61 @@ export default function PdfEditor({ file, saving, onRemove, onSave }: PdfEditorP
             </div>
           </>
         )}
+        {(activeTool === 'highlight' || activeTool === 'underline' || activeTool === 'strikeout' || activeTool === 'note' || selectedElement?.type === 'annotation') && (
+          <>
+            <label><span>Annotation color</span><input type="color" value={selectedElement?.type === 'annotation' ? selectedElement.color : annotationColor} onChange={(event) => { setAnnotationColor(event.target.value); if (selectedElement?.type === 'annotation') changeSelected({ color: event.target.value } as Partial<PdfEditElement>) }} /></label>
+            {selectedElement?.type === 'annotation' && selectedElement.annotation === 'note' && (
+              <label><span>Comment</span><input className="pdf-editor-annotation-text" type="text" value={selectedElement.text} onChange={(event) => changeSelected({ text: event.target.value } as Partial<PdfEditElement>)} /></label>
+            )}
+          </>
+        )}
         {!selectedElement && activeTool === 'select' && <span className="pdf-editor-context-hint">Select an object to edit its appearance. Double-click text to change it.</span>}
       </div>
 
-      <div className="pdf-editor-main">
-        <aside className="pdf-editor-pages">
-          <div><strong>Pages</strong><span>{pdf?.numPages ?? 0}</span></div>
-          <div className="pdf-editor-page-list">
-            {pdf && Array.from({ length: pdf.numPages }, (_, index) => index + 1).map((pageNumber) => (
-              <button className={currentPage === pageNumber ? 'selected' : ''} type="button" key={pageNumber} onClick={() => { setCurrentPage(pageNumber); setSelectedId(null) }}>
-                <PdfPageThumbnail file={file} pageNumber={pageNumber} />
-                <span>{pageNumber}</span>
-                {document.elements.some((element) => element.page === pageNumber) && <i />}
-              </button>
-            ))}
-          </div>
-        </aside>
+      <div className={`pdf-editor-main ${pagesOpen ? '' : 'pages-closed'}`} style={{ gridTemplateColumns: pagesOpen ? `${pagesWidth}px minmax(0, 1fr)` : 'minmax(0, 1fr)' }}>
+        {pagesOpen && (
+          <aside className="pdf-editor-pages">
+            <div className="pdf-editor-pages-header">
+              <strong>Pages</strong>
+              <div>
+                <span>{pdf?.numPages ?? 0}</span>
+                <button type="button" onClick={() => setPagesOpen(false)} title="Close pages sidebar" aria-label="Close pages sidebar"><FiX /></button>
+              </div>
+            </div>
+            <div className="pdf-editor-page-list">
+              {pdf && Array.from({ length: pdf.numPages }, (_, index) => index + 1).map((pageNumber) => (
+                <button className={currentPage === pageNumber ? 'selected' : ''} type="button" key={pageNumber} onClick={() => { setCurrentPage(pageNumber); setSelectedId(null) }}>
+                  <PdfPageThumbnail file={file} pageNumber={pageNumber} />
+                  <span>{pageNumber}</span>
+                  {document.elements.some((element) => element.page === pageNumber) && <i />}
+                </button>
+              ))}
+            </div>
+            <div
+              className="pdf-editor-pages-resizer"
+              role="separator"
+              aria-label="Resize pages sidebar"
+              aria-orientation="vertical"
+              aria-valuemin={112}
+              aria-valuemax={360}
+              aria-valuenow={pagesWidth}
+              tabIndex={0}
+              onPointerDown={startPagesResize}
+              onKeyDown={(event) => {
+                if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight' && event.key !== 'Home' && event.key !== 'End') return
+                event.preventDefault()
+                if (event.key === 'Home') setPagesWidth(112)
+                else if (event.key === 'End') setPagesWidth(360)
+                else setPagesWidth((current) => clamp(current + (event.key === 'ArrowLeft' ? -12 : 12), 112, 360))
+              }}
+            />
+          </aside>
+        )}
+        {!pagesOpen && (
+          <button className="pdf-editor-pages-open" type="button" onClick={() => setPagesOpen(true)} title="Open pages sidebar">
+            <FiSidebar /><span>Pages</span>
+          </button>
+        )}
 
         <div className={`pdf-editor-canvas-scroll tool-${activeTool}`} ref={scrollRef}>
           <div className="pdf-editor-page" style={{ width: pageSize.width, height: pageSize.height }}>
