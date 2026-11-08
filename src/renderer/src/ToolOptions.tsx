@@ -321,7 +321,7 @@ export default function ToolOptions({
             <span><strong>{title}</strong><small>{detail}</small></span>
           </button>
         ))}
-        <p>Conversion runs locally through Microsoft Word or LibreOffice. No document is uploaded.</p>
+        <p>Conversion runs locally through LibreOffice. No document is uploaded.</p>
       </div>
     )
   }

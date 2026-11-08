@@ -257,9 +257,9 @@ select:focus-visible {
   bottom: var(--workspace-bottom-inset);
   left: 12px;
   display: grid;
-  grid-template-columns: 25px 1fr auto;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   margin-top: 0;
   padding: 12px 10px;
   border: 1px solid #dfe2d8;
@@ -276,11 +276,13 @@ select:focus-visible {
 
 .sidebar footer div {
   display: flex;
+  min-width: 0;
   flex-direction: column;
 }
 
 .sidebar footer strong {
   font-size: 9px;
+  white-space: nowrap;
 }
 
 .sidebar footer span,
@@ -4045,6 +4047,17 @@ button:disabled {
   font-size: 10px;
 }
 
+.pdf-editor-contextbar input.pdf-editor-annotation-text {
+  width: min(260px, 32vw);
+  height: 32px;
+  padding: 0 9px;
+  border: 1px solid #d7dcd6;
+  border-radius: 7px;
+  color: #3d463f;
+  background: #fff;
+  font-size: 10px;
+}
+
 .pdf-editor-contextbar input.pdf-editor-number {
   width: 58px;
   padding-right: 7px;
@@ -4088,12 +4101,13 @@ button:disabled {
   display: grid;
   min-width: 0;
   min-height: 0;
-  grid-template-columns: 124px minmax(0, 1fr);
   overflow: hidden;
 }
 
 .pdf-editor-pages {
+  position: relative;
   display: flex;
+  min-width: 0;
   min-height: 0;
   flex-direction: column;
   padding: 12px 10px;
@@ -4102,7 +4116,7 @@ button:disabled {
   background: #f8f8f4;
 }
 
-.pdf-editor-pages > div:first-child {
+.pdf-editor-pages-header {
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -4111,9 +4125,98 @@ button:disabled {
   font-size: 10px;
 }
 
-.pdf-editor-pages > div:first-child span {
+.pdf-editor-pages-header > div {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.pdf-editor-pages-header span {
   color: #949a95;
   font-variant-numeric: tabular-nums;
+}
+
+.pdf-editor-pages-header button {
+  display: grid;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  place-items: center;
+  border: 0;
+  border-radius: 6px;
+  color: #7b837d;
+  background: transparent;
+  cursor: pointer;
+}
+
+.pdf-editor-pages-header button:hover,
+.pdf-editor-pages-header button:focus-visible {
+  color: #286b4c;
+  background: #e9f1ec;
+}
+
+.pdf-editor-pages-header button svg {
+  width: 14px;
+  height: 14px;
+}
+
+.pdf-editor-pages-resizer {
+  position: absolute;
+  z-index: 4;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 8px;
+  cursor: col-resize;
+  touch-action: none;
+}
+
+.pdf-editor-pages-resizer::after {
+  position: absolute;
+  top: 0;
+  right: 3px;
+  bottom: 0;
+  width: 2px;
+  background: transparent;
+  content: '';
+  transition: background 120ms ease;
+}
+
+.pdf-editor-pages-resizer:hover::after,
+.pdf-editor-pages-resizer:focus-visible::after {
+  background: #6d9f82;
+}
+
+.pdf-editor-pages-open {
+  position: absolute;
+  z-index: 6;
+  top: 12px;
+  left: 12px;
+  display: inline-flex;
+  height: 34px;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px;
+  border: 1px solid #cfd5cf;
+  border-radius: 8px;
+  color: #59635c;
+  background: rgba(255, 255, 253, 0.94);
+  font-size: 10px;
+  font-weight: 700;
+  cursor: pointer;
+  box-shadow: 0 4px 14px rgba(34, 43, 37, 0.1);
+  backdrop-filter: blur(10px);
+}
+
+.pdf-editor-pages-open:hover {
+  color: #286b4c;
+  border-color: #9fc2ad;
+  background: #fff;
+}
+
+.pdf-editor-pages-open svg {
+  width: 15px;
+  height: 15px;
 }
 
 .pdf-editor-page-list {
@@ -4150,8 +4253,9 @@ button:disabled {
 }
 
 .pdf-editor-page-list .organize-page-thumbnail {
-  width: 84px;
-  height: 108px;
+  width: min(100%, 210px);
+  height: auto;
+  aspect-ratio: 7 / 9;
   border-radius: 3px;
   background: #fff;
   box-shadow: 0 2px 7px rgba(40, 50, 44, 0.12);
@@ -4181,7 +4285,11 @@ button:disabled {
 .pdf-editor-canvas-scroll.tool-hand:active { cursor: grabbing; }
 .pdf-editor-canvas-scroll.tool-text,
 .pdf-editor-canvas-scroll.tool-shape,
-.pdf-editor-canvas-scroll.tool-draw { cursor: crosshair; }
+.pdf-editor-canvas-scroll.tool-draw,
+.pdf-editor-canvas-scroll.tool-highlight,
+.pdf-editor-canvas-scroll.tool-underline,
+.pdf-editor-canvas-scroll.tool-strikeout,
+.pdf-editor-canvas-scroll.tool-note { cursor: crosshair; }
 
 .pdf-editor-page {
   position: relative;

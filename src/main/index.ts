@@ -2,6 +2,7 @@ import { app, BrowserWindow, dialog, ipcMain, Menu, shell } from 'electron'
 import { readFile, stat, writeFile } from 'node:fs/promises'
 import { basename, extname, join } from 'node:path'
 import { electronApp, is } from '@electron-toolkit/utils'
+import packageMetadata from '../../package.json'
 import { BackendService, filenameForOutput } from './backend'
 import type { DesktopFile, ProcessRequest, ToolId } from '../shared/types'
 
@@ -37,8 +38,8 @@ function createWindow(): void {
   mainWindow = new BrowserWindow({
     width: 1220,
     height: 720,
-    minWidth: 1120,
-    minHeight: 720,
+    minWidth: 1040,
+    minHeight: 640,
     fullscreenable: false,
     show: false,
     title: 'MyPDF',
@@ -149,7 +150,7 @@ function registerIpc(): void {
   })
 
   ipcMain.handle('shell:show-item', async (_event, path: string) => shell.showItemInFolder(path))
-  ipcMain.handle('app:version', () => app.getVersion())
+  ipcMain.handle('app:version', () => packageMetadata.version)
 }
 
 app.whenReady().then(async () => {

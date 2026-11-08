@@ -2,15 +2,13 @@
 
 ## Requirements
 
-PowerPoint rendering requires an installed presentation application.
+PowerPoint rendering uses LibreOffice in headless mode.
 
-- **macOS:** Microsoft PowerPoint is used when installed; LibreOffice is the fallback.
+- **macOS:** Install LibreOffice: `brew install --cask libreoffice`.
 - **Windows:** Install [LibreOffice](https://www.libreoffice.org/download/download-libreoffice/).
 - **Linux:** Install LibreOffice Impress: `sudo apt install libreoffice-impress`.
-- **macOS LibreOffice fallback:** `brew install --cask libreoffice`.
 
-Restart MyPDF after installation. On the first macOS conversion, allow Electron
-or Python to control Microsoft PowerPoint when prompted.
+Restart MyPDF after installation. MyPDF does not open or automate Microsoft PowerPoint.
 
 ## Usage
 
@@ -27,7 +25,6 @@ All conversion is local.
 
 ## Limitations
 
-- Microsoft PowerPoint may briefly open on macOS.
 - Animations, transitions, audio, video, and interactive elements are not preserved in PDF or flattened output.
 - Missing fonts may change layout.
 - LibreOffice output can differ slightly from Microsoft PowerPoint rendering.

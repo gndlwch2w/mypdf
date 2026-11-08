@@ -26,7 +26,7 @@ A local-first desktop PDF toolkit. Files are processed on the current device and
 - Python 3.9+
 - npm
 - Tesseract (optional, required only for OCR)
-- LibreOffice (required for PowerPoint and Word conversion when Microsoft Office is unavailable)
+- LibreOffice (required for PowerPoint and Word conversion)
 
 PowerPoint setup and usage: [docs/powerpoint-conversion.md](docs/powerpoint-conversion.md)
 

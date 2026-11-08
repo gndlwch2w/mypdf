@@ -468,7 +468,7 @@ export default function App(): React.JSX.Element {
                     <h2>Drop {activeTool!.imageInput ? 'images' : activeTool!.powerpointInput ? 'a PowerPoint file' : activeTool!.wordInput ? 'Word documents' : 'PDF files'} here</h2>
                     <p>or select them from your Mac</p>
                     <span>Choose files</span>
-                    <small>{activeTool!.imageInput ? 'JPG, PNG, WebP, TIFF and BMP' : activeTool!.powerpointInput ? 'PPT and PPTX · Microsoft PowerPoint or LibreOffice required' : activeTool!.wordInput ? 'DOC and DOCX · Microsoft Word or LibreOffice required' : 'PDF documents · up to 50 MB each'}</small>
+                    <small>{activeTool!.imageInput ? 'JPG, PNG, WebP, TIFF and BMP' : activeTool!.powerpointInput ? 'PPT and PPTX · LibreOffice required' : activeTool!.wordInput ? 'DOC and DOCX · LibreOffice required' : 'PDF documents · up to 50 MB each'}</small>
                   </button>
                 ) : (
                   selectedTool === 'organize' ? (

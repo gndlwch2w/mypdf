@@ -319,7 +319,7 @@ async def edit_pdf(
     operations: str = Form(...),
     assets: Optional[List[UploadFile]] = File(None),
 ):
-    """Apply text, image, shape and drawing overlays to a PDF."""
+    """Apply text, image, shape, drawing and annotation edits to a PDF."""
     try:
         file_data = await FileValidator.validate_pdf_file(file)
         try:
